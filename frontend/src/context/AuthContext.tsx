@@ -3,7 +3,7 @@ import { apiClient } from '../api/client';
 
 export interface User {
   id: number;
-  name: str;
+  name: string;
   email: string;
 }
 
