@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 from fastapi import UploadFile
 from pypdf import PdfReader
+import docx
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 STORAGE_DIR = BASE_DIR / "uploads"
@@ -24,13 +25,17 @@ async def save_uploaded_file(file: UploadFile) -> tuple[str, str, int]:
 def extract_text_from_file(file_path: str, file_type: str) -> str:
     extracted_text = ""
     try:
-        if file_type.lower() == ".pdf":
+        ext = file_type.lower()
+        if ext == ".pdf":
             reader = PdfReader(file_path)
             for page in reader.pages:
                 text = page.extract_text()
                 if text:
                     extracted_text += text + "\n"
-        elif file_type.lower() in [".txt", ".md"]:
+        elif ext == ".docx":
+            doc = docx.Document(file_path)
+            extracted_text = "\n".join([p.text for p in doc.paragraphs if p.text])
+        elif ext in [".txt", ".md"]:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 extracted_text = f.read()
     except Exception as e:

@@ -83,12 +83,12 @@ export const DocumentManager: React.FC = () => {
           <Upload className="w-4 h-4" />
           {uploading ? 'Uploading...' : 'Upload File'}
           <input
-            type="file"
-            accept=".pdf,.txt,.md"
-            onChange={handleFileUpload}
-            disabled={uploading}
-            className="hidden"
-          />
+              type="file"
+              accept=".pdf,.txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={handleFileUpload}
+              disabled={uploading}
+              className="hidden"
+            />
         </label>
       </div>
 

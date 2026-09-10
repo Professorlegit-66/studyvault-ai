@@ -12,7 +12,7 @@ from app.services.document_service import save_uploaded_file, extract_text_from_
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
+ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx"}
 
 @router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
