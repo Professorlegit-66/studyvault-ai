@@ -1,11 +1,16 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     APP_NAME: str = "StudyVault AI"
     ENVIRONMENT: str = "development"
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/studyvault_db"
+    DATABASE_URL: str
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
+    
+    JWT_SECRET_KEY: str = "super-secret-jwt-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    class Config:
+        env_file = ".env"
 
 settings = Settings()
