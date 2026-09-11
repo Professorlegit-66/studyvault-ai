@@ -25,7 +25,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Moved outside useEffect so login() can call it directly
   const fetchCurrentUser = async (currentToken: string) => {
     try {
       const response = await apiClient.get<User>('/auth/me', {
@@ -49,18 +48,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [token]);
 
   const login = async (email: string, password: string) => {
-    const formData = new URLSearchParams();
-    formData.append('username', email);
-    formData.append('password', password);
+    const params = new URLSearchParams();
+    params.append('username', email);
+    params.append('password', password);
 
-    const response = await apiClient.post('/auth/login', formData, {
+    const response = await apiClient.post('/auth/login', params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
 
-    const { access_token } = response.data;
-    localStorage.setItem(TOKEN_KEY, access_token);
-    setToken(access_token);
-    await fetchCurrentUser(access_token);
+    const newToken = response.data.access_token;
+    localStorage.setItem(TOKEN_KEY, newToken);
+    setToken(newToken);
+    await fetchCurrentUser(newToken);
   };
 
   const register = async (name: string, email: string, password: string) => {

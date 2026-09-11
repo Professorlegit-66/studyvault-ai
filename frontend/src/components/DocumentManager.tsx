@@ -1,33 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { apiClient } from '../api/client';
 import { Upload, FileText, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 
 export interface Document {
   id: number;
-  filename: string;
+  user_id: number;
+  title: string;
+  file_path: string;
   file_type: string;
-  file_size: number;
+  file_size?: number;
+  summary?: string;
+  key_points?: string[];
   created_at: string;
 }
 
-export const DocumentManager: React.FC = () => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+interface DocumentManagerProps {
+  documents: Document[];
+  onDocumentsChange: () => void;
+}
+
+export const DocumentManager: React.FC<DocumentManagerProps> = ({
+  documents,
+  onDocumentsChange,
+}) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
-  const fetchDocuments = async () => {
-    try {
-      const response = await apiClient.get<Document[]>('/documents/');
-      setDocuments(response.data);
-    } catch (err) {
-      console.error('Failed to fetch documents', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -47,13 +45,11 @@ export const DocumentManager: React.FC = () => {
         },
       });
       setSuccess(`"${selectedFile.name}" uploaded and processed successfully!`);
-      fetchDocuments();
+      onDocumentsChange();
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (typeof detail === 'string') {
         setError(detail);
-      } else if (Array.isArray(detail)) {
-        setError(detail.map((item: any) => item.msg || 'Invalid field').join(', '));
       } else {
         setError('Upload failed. Please try again.');
       }
@@ -66,7 +62,7 @@ export const DocumentManager: React.FC = () => {
   const handleDelete = async (id: number) => {
     try {
       await apiClient.delete(`/documents/${id}`);
-      setDocuments(documents.filter((doc) => doc.id !== id));
+      onDocumentsChange();
     } catch (err) {
       console.error('Failed to delete document', err);
     }
@@ -83,12 +79,12 @@ export const DocumentManager: React.FC = () => {
           <Upload className="w-4 h-4" />
           {uploading ? 'Uploading...' : 'Upload File'}
           <input
-              type="file"
-              accept=".pdf,.txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={handleFileUpload}
-              disabled={uploading}
-              className="hidden"
-            />
+            type="file"
+            accept=".pdf,.txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={handleFileUpload}
+            disabled={uploading}
+            className="hidden"
+          />
         </label>
       </div>
 
@@ -123,9 +119,11 @@ export const DocumentManager: React.FC = () => {
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-200">{doc.filename}</h4>
+                  <h4 className="text-sm font-semibold text-slate-200">
+                    {doc.title || 'Untitled Document'}
+                  </h4>
                   <span className="text-xs text-slate-400">
-                    {(doc.file_size / 1024).toFixed(1)} KB • {doc.file_type.toUpperCase()}
+                    {doc.file_size ? (doc.file_size / 1024).toFixed(1) : '0.0'} KB • {doc.file_type?.toUpperCase()}
                   </span>
                 </div>
               </div>

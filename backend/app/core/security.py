@@ -1,17 +1,16 @@
 from datetime import datetime, timedelta, timezone
 import jwt
-from pwdlib import PasswordHash
-from pwdlib.hashers.argon2 import Argon2Hasher
+from passlib.context import CryptContext
 from app.config import settings
 
-# Initialize modern password hashing context
-password_hash = PasswordHash((Argon2Hasher(),))
+# CryptContext handles hashing and verification reliably
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def hash_password(password: str) -> str:
-    return password_hash.hash(password)
+    return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return password_hash.verify(plain_password, hashed_password)
+    return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(subject: str | int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

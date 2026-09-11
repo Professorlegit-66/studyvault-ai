@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, LogIn } from 'lucide-react';
+import { BookOpen, LogIn, Loader2 } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -13,17 +13,16 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); // Prevents page reload / flashing
+    e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      // Handles both object-style or positional login arguments safely
-      await (login as any)(email, password);
+      await login(email, password);
       navigate('/');
     } catch (err: any) {
       const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Login failed. Please check your credentials.');
+      setError(typeof detail === 'string' ? detail : 'Incorrect email or password');
     } finally {
       setLoading(false);
     }
@@ -54,9 +53,10 @@ export const Login: React.FC = () => {
             <input
               type="email"
               required
+              disabled={loading}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 text-sm"
+              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 text-sm disabled:opacity-50"
               placeholder="user@example.com"
             />
           </div>
@@ -68,9 +68,10 @@ export const Login: React.FC = () => {
             <input
               type="password"
               required
+              disabled={loading}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 text-sm"
+              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 text-sm disabled:opacity-50"
               placeholder="••••••••"
             />
           </div>
@@ -80,8 +81,17 @@ export const Login: React.FC = () => {
             disabled={loading}
             className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
           >
-            <LogIn className="w-4 h-4" />
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </>
+            )}
           </button>
         </form>
 
