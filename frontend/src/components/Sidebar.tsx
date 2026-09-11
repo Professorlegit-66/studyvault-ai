@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, FileText, Bot, Brain, Plus, LogOut, BookOpen } from 'lucide-react';
+import { Menu, Compass, FileText, Bot, Brain, Plus, LogOut, BookOpen } from 'lucide-react';
 
 interface SidebarProps {
   isExpanded: boolean;
@@ -17,6 +17,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
 }) => {
   const menuItems = [
+    { id: 'home', label: 'Home', icon: Compass },
     { id: 'documents', label: 'Vault Documents', icon: FileText },
     { id: 'chat', label: 'AI Tutor Chat', icon: Bot },
     { id: 'memory', label: 'Student Memory', icon: Brain },
@@ -24,7 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`bg-slate-900 border-r border-slate-800 h-screen sticky top-0 flex flex-col justify-between transition-all duration-300 z-20 ${
+      className={`bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-screen sticky top-0 flex flex-col justify-between transition-all duration-300 z-20 ${
         isExpanded ? 'w-64' : 'w-20'
       }`}
     >
@@ -33,16 +34,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onToggle}
-            className="p-2.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-colors"
+            className="p-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
           >
             <Menu className="w-5 h-5" />
           </button>
           {isExpanded && (
             <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
-              <div className="p-1.5 bg-indigo-600/20 text-indigo-400 rounded-lg">
+              <div className="p-1.5 bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
                 <BookOpen className="w-4 h-4" />
               </div>
-              <span className="font-bold text-base text-slate-100">StudyVault AI</span>
+              <span className="font-bold text-base text-slate-900 dark:text-slate-100">
+                StudyVault AI
+              </span>
             </div>
           )}
         </div>
@@ -71,8 +74,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   isExpanded ? 'px-4 py-3' : 'p-3 justify-center'
                 } ${
                   isActive
-                    ? 'bg-slate-800 text-indigo-400 font-semibold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                    ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-semibold'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
                 }`}
               >
                 {/* Active Indicator Strip */}
@@ -88,10 +91,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Logout Footer */}
-      <div className="p-4 border-t border-slate-800/80">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-800/80">
         <button
           onClick={onLogout}
-          className={`w-full flex items-center gap-3.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors ${
+          className={`w-full flex items-center gap-3.5 text-slate-500 dark:text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors ${
             isExpanded ? 'px-4 py-3' : 'p-3 justify-center'
           }`}
         >
