@@ -9,6 +9,7 @@ import type { Message } from '../components/AITutorChat';
 import { LayoutDashboard, FileText, Brain, MessageSquare, Sun, Moon, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import HelpAssistant from '../components/HelpAssistant';
 
 interface DashboardProps {
   onOpenProfile?: () => void;
@@ -173,6 +174,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           {activeTab === 'memory' && <StudentMemory />}
         </div>
       </main>
+
+      <HelpAssistant />
     </div>
   );
 };
