@@ -1,133 +1,177 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
-import { Sidebar } from '../components/Sidebar';
 import { HomeOverview } from '../components/HomeOverview';
 import { DocumentManager } from '../components/DocumentManager';
 import type { Document } from '../components/DocumentManager';
+import { StudentMemory } from '../components/StudentMemory';
 import { AITutorChat } from '../components/AITutorChat';
 import type { Message } from '../components/AITutorChat';
-import { StudentMemory } from '../components/StudentMemory';
-import { ThemeToggle } from '../components/ThemeToggle';
-import { Loader2 } from 'lucide-react';
-
-const STORAGE_KEY = 'studyvault_chat_history';
+import { LayoutDashboard, FileText, Brain, MessageSquare, Sun, Moon, LogOut, Menu } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const Dashboard: React.FC = () => {
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout } = useAuth() as { user: { name?: string; username?: string; email?: string } | null; logout: () => void };
+  const [activeTab, setActiveTab] = useState<'home' | 'documents' | 'memory' | 'chat'>('home');
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
-
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse chat history', e);
-      }
-    }
-    return [
-      {
-        sender: 'ai',
-        text: 'Hello! Ask me anything grounded in your uploaded documents.',
-      },
-    ];
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-  }, [messages]);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      sender: 'ai',
+      text: 'Hello! I am your AI Tutor. Ask me anything about your uploaded study documents or notes!',
+    },
+  ]);
 
   const fetchDocuments = async () => {
     try {
-      const res = await apiClient.get<Document[]>('/documents/');
+      const res = await apiClient.get<Document[]>('/documents');
       setDocuments(res.data);
     } catch (err) {
-      console.error('Error fetching documents', err);
+      console.error('Failed to load documents', err);
     }
   };
 
   useEffect(() => {
-    if (user) {
-      fetchDocuments();
+    fetchDocuments();
+    document.documentElement.classList.add('dark');
+  }, []);
+
+  const toggleTheme = () => {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    if (nextMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
-  }, [user]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-100">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  const displayName = user.name || user.full_name || 'Student';
+  };
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex transition-colors duration-300">
-      <Sidebar
-        isExpanded={isSidebarExpanded}
-        onToggle={() => setIsSidebarExpanded((prev) => !prev)}
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        onLogout={logout}
-      />
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur px-8 flex items-center justify-between sticky top-0 z-10 transition-colors duration-300">
-          <h2 className="font-bold text-lg text-slate-800 dark:text-slate-200 capitalize">
-            {activeTab === 'home' && 'Home Dashboard'}
-            {activeTab === 'chat' && 'AI Tutor Chat'}
-            {activeTab === 'documents' && 'Documents Vault'}
-            {activeTab === 'memory' && 'Student Memory'}
-          </h2>
-
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              Welcome, <strong className="text-slate-800 dark:text-slate-200">{displayName}</strong>
-            </span>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300">
+      {/* Sidebar Navigation */}
+      <aside className={`border-r border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between bg-white dark:bg-slate-950 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20 items-center px-3'}`}>
+        <div className={`space-y-8 w-full overflow-hidden ${!isSidebarOpen ? 'flex flex-col items-center' : ''}`}>
+          <div className={`flex items-center w-full ${isSidebarOpen ? 'gap-3' : 'justify-center'}`}>
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors cursor-pointer shrink-0"
+              title="Toggle Sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            {isSidebarOpen && (
+              <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/30 shrink-0">
+                  <Brain className="w-5 h-5" />
+                </div>
+                <span className="font-bold text-lg tracking-tight truncate">StudyVault AI</span>
+              </div>
+            )}
           </div>
-        </header>
 
-        <main className="p-8 max-w-5xl mx-auto w-full">
-          {/* Home Overview Tab */}
-          <div className={activeTab === 'home' ? 'block' : 'hidden'}>
+          <nav className={`space-y-1.5 w-full overflow-hidden ${!isSidebarOpen ? 'flex flex-col items-center' : ''}`}>
+            <button
+              onClick={() => setActiveTab('home')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+                activeTab === 'home' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
+              } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+              title="Overview"
+            >
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              {isSidebarOpen && <span className="truncate">Overview</span>}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+                activeTab === 'documents' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
+              } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+              title="Documents Vault"
+            >
+              <FileText className="w-4 h-4 shrink-0" />
+              {isSidebarOpen && <span className="truncate">Documents Vault</span>}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+                activeTab === 'chat' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
+              } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+              title="AI Tutor Chat"
+            >
+              <MessageSquare className="w-4 h-4 shrink-0" />
+              {isSidebarOpen && <span className="truncate">AI Tutor Chat</span>}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('memory')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+                activeTab === 'memory' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
+              } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+              title="Student Memory"
+            >
+              <Brain className="w-4 h-4 shrink-0" />
+              {isSidebarOpen && <span className="truncate">Student Memory</span>}
+            </button>
+          </nav>
+        </div>
+
+        <button
+          onClick={logout}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-rose-500 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+          title="Sign Out"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          {isSidebarOpen && <span className="truncate">Sign Out</span>}
+        </button>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-10 overflow-y-auto">
+        <div className="flex items-center justify-end gap-4 mb-6">
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle Theme"
+            className="relative flex items-center w-16 h-8 p-1 bg-slate-200 dark:bg-slate-900 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer border border-slate-300 dark:border-slate-800"
+          >
+            <div
+              className={`flex items-center justify-center w-6 h-6 bg-white dark:bg-slate-800 rounded-full shadow-md transform transition-transform duration-300 ${
+                isDarkMode ? 'translate-x-8 text-slate-200' : 'translate-x-0 text-amber-500'
+              }`}
+            >
+              {isDarkMode ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+            </div>
+            <div className="absolute inset-0 flex justify-between items-center px-2 pointer-events-none text-slate-400 dark:text-slate-600">
+              <Sun className="w-3.5 h-3.5" />
+              <Moon className="w-3.5 h-3.5" />
+            </div>
+          </button>
+
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            Welcome, <span className="font-semibold text-slate-900 dark:text-slate-100">{user?.username || user?.name || user?.email?.split('@')[0] || 'Student'}</span>
+          </span>
+        </div>
+
+        <div className="max-w-5xl mx-auto">
+          {activeTab === 'home' && (
             <HomeOverview
-              userName={displayName}
+              userName={user?.username || user?.name || user?.email?.split('@')[0] || 'Student'}
               documentCount={documents.length}
-              onNavigate={setActiveTab}
+              onNavigate={(tab) => setActiveTab(tab as any)}
             />
-          </div>
+          )}
 
-          {/* Vault Documents Tab */}
-          <div className={activeTab === 'documents' ? 'block' : 'hidden'}>
+          {activeTab === 'documents' && (
             <DocumentManager documents={documents} onDocumentsChange={fetchDocuments} />
-          </div>
+          )}
 
-          {/* AI Tutor Chat Tab */}
-          <div className={activeTab === 'chat' ? 'block' : 'hidden'}>
-            <AITutorChat
-              documents={documents}
-              messages={messages}
-              setMessages={setMessages}
-            />
-          </div>
+          {activeTab === 'chat' && (
+            <AITutorChat documents={documents} messages={messages} setMessages={setMessages} />
+          )}
 
-          {/* Student Memory Tab */}
-          <div className={activeTab === 'memory' ? 'block' : 'hidden'}>
-            <StudentMemory />
-          </div>
-        </main>
-      </div>
+          {activeTab === 'memory' && <StudentMemory />}
+        </div>
+      </main>
     </div>
   );
 };
-
-export default Dashboard;

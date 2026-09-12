@@ -4,7 +4,6 @@ import { FileText, FileCode, FileSpreadsheet, File, Upload, Sparkles, Loader2, C
 
 export interface Document {
   id: number;
-  filename?: string;
   title?: string;
   file_path?: string;
   created_at: string;
@@ -102,7 +101,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
         ) : (
           <div className="divide-y divide-slate-200 dark:divide-slate-700/60">
             {documents.map((doc) => {
-              const name = doc.filename || doc.title || `Document #${doc.id}`;
+              const name = doc.title || `Document #${doc.id}`;
               const fileMeta = getFileIcon(name);
               const IconComponent = fileMeta.icon;
 
