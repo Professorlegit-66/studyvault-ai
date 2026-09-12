@@ -43,5 +43,8 @@ async def get_analytics_summary(
         "total_flashcards": total_cards,
         "due_flashcards": due_cards,
         "average_ease_factor": round(float(avg_ease), 2),
-        "retention_score": min(100, int((total_cards - due_cards) / max(1, total_cards) * 100))
+        "retention_score": min(100, int((total_cards - due_cards) / max(1, total_cards) * 100)),
+        # current_streak is just read off the user row (updated on login in
+        # auth.py's _update_login_streak) - no extra query needed here.
+        "current_streak": current_user.current_streak
     }

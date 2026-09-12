@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,6 +60,30 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
     return new_user
 
+def _update_login_streak(user: User) -> None:
+    """
+    Updates user.current_streak and user.last_login_date in place, based on
+    today's date (UTC) vs. the last recorded login date.
+
+    - No previous login (or streak was already broken/reset) -> streak = 1
+    - Already logged in today -> no change (prevents multiple logins/day from
+      inflating the streak)
+    - Last login was yesterday -> streak += 1
+    - Last login was any earlier date -> streak resets to 1
+    """
+    today = datetime.now(timezone.utc).date()
+
+    if user.last_login_date is None:
+        user.current_streak = 1
+    elif user.last_login_date == today:
+        pass  # already counted today, don't double-increment
+    elif user.last_login_date == today - timedelta(days=1):
+        user.current_streak += 1
+    else:
+        user.current_streak = 1
+
+    user.last_login_date = today
+
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.email == form_data.username)
@@ -70,6 +95,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
             detail="Incorrect email or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    _update_login_streak(user)
+    await db.commit()
 
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}

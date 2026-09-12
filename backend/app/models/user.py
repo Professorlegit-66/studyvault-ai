@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, List
-from sqlalchemy import String, DateTime
+from datetime import datetime, date, timezone
+from typing import TYPE_CHECKING, List, Optional
+from sqlalchemy import String, DateTime, Date, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -20,6 +20,14 @@ class User(Base):
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)
     )
+
+    # --- Streak tracking (added for Overview dashboard "Active Study Streak" card) ---
+    # last_login_date: the calendar date (UTC) of the user's most recent login.
+    # Nullable because existing users won't have a value until they next log in.
+    last_login_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # current_streak: number of consecutive days logged in, ending at last_login_date.
+    # Defaults to 0 for new/never-logged-in users.
+    current_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     documents: Mapped[List["Document"]] = relationship("Document", back_populates="user", cascade="all, delete-orphan")
     conversations: Mapped[List["Conversation"]] = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")

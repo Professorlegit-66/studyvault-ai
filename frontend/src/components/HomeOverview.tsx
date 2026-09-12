@@ -19,6 +19,7 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
   const [recentDocs, setRecentDocs] = useState<ActivityItem[]>([]);
   const [cardCount, setCardCount] = useState(0);
   const [masteryPercent, setMasteryPercent] = useState<number | null>(null);
+  const [streakDays, setStreakDays] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchOverviewData = async () => {
@@ -36,6 +37,9 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
         }
         if (analyticsRes.data && typeof analyticsRes.data.retention_score === 'number') {
           setMasteryPercent(analyticsRes.data.retention_score);
+        }
+        if (analyticsRes.data && typeof analyticsRes.data.current_streak === 'number') {
+          setStreakDays(analyticsRes.data.current_streak);
         }
       } catch (err) {
         console.error('Failed to load overview data', err);
@@ -79,7 +83,9 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
             <Flame className="w-5 h-5" />
             <span className="text-xs font-semibold px-2 py-0.5 bg-amber-500/10 rounded-full">Streak</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">5 Days</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">
+            {streakDays !== null ? `${streakDays} ${streakDays === 1 ? 'Day' : 'Days'}` : '—'}
+          </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">Active Study Streak</p>
         </div>
 
