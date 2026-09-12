@@ -8,7 +8,7 @@ from app.models.document import Document
 from app.models.user import User
 from app.api.deps import get_current_user
 
-router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 @router.get("/summary")
 async def get_analytics_summary(
