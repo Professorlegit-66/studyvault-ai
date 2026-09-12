@@ -15,7 +15,11 @@ class Document(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
-    file_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # file_type was originally String(50), but that overflowed on full MIME
+    # type strings (e.g. "application/vnd.openxmlformats-officedocument...",
+    # 73 chars). The DB column was widened to VARCHAR(255) at the time, but
+    # this model was never updated to match - fixing that drift here.
+    file_type: Mapped[str] = mapped_column(String(255), nullable=False)
     file_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
     subject: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     semester: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
