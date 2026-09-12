@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from app.database import get_db
 from app.models.document import Document
@@ -14,11 +14,17 @@ from app.api.deps import get_current_user
 from app.services.sm2 import calculate_sm2
 from app.services.flashcard_gen import generate_flashcards_from_text
 
-router = APIRouter(prefix="/api/memory", tags=["student-memory"])
+router = APIRouter(prefix="/memory", tags=["Student Memory"])
 
 
 class ReviewRequest(BaseModel):
     quality: int  # 0 to 5 rating
+
+
+class SnippetFlashcardRequest(BaseModel):
+    snippet: str
+    title: str
+    document_id: Optional[int] = None
 
 
 class FlashcardResponse(BaseModel):
@@ -137,4 +143,38 @@ async def generate_cards_for_doc(
         }
     except Exception as e:
         print(f"Flashcard generation router error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/generate-from-snippet")
+async def generate_flashcard_from_snippet(
+    payload: SnippetFlashcardRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not payload.snippet.strip():
+        raise HTTPException(status_code=400, detail="Snippet text cannot be empty")
+
+    try:
+        cards_data = await generate_flashcards_from_text(payload.snippet, topic=payload.title)
+
+        created_cards = []
+        for item in cards_data:
+            card = Flashcard(
+                user_id=current_user.id,
+                document_id=payload.document_id,
+                topic=payload.title,
+                question=item.get("question", "Review concept"),
+                answer=item.get("answer", "Refer to document notes."),
+            )
+            db.add(card)
+            created_cards.append(card)
+
+        await db.commit()
+        return {
+            "message": f"Successfully generated {len(created_cards)} flashcard(s) from snippet!",
+            "count": len(created_cards),
+        }
+    except Exception as e:
+        print(f"Snippet flashcard generation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

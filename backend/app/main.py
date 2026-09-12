@@ -17,8 +17,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
-app.include_router(doc_router)
-app.include_router(rag_router)
-app.include_router(student_memory_router)
-app.include_router(analytics_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(doc_router, prefix="/api")
+app.include_router(rag_router, prefix="/api")
+app.include_router(student_memory_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")

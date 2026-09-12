@@ -15,7 +15,7 @@ from app.models.document import Document
 from app.models.chunk import DocumentChunk
 from app.config import settings
 
-router = APIRouter(prefix="/api/rag", tags=["rag"])
+router = APIRouter(prefix="/rag", tags=["rag"])
 
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
