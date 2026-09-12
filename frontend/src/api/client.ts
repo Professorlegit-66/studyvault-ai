@@ -5,7 +5,13 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  // Must match the key AuthContext.tsx's login()/logout() use ('access_token').
+  // This was previously reading a different, stale key ('token') that was
+  // never updated on login or cleared on logout - causing every data request
+  // (documents, flashcards, analytics, etc.) to silently authenticate as
+  // whichever account last happened to leave a value under 'token', instead
+  // of whoever is actually logged in.
+  const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -16,7 +22,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
+      localStorage.removeItem('access_token');
       localStorage.removeItem('studyvault_chat_history');
     }
     return Promise.reject(error);

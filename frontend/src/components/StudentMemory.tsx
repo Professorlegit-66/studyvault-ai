@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Brain, Download, CheckCircle, RotateCw, RefreshCw, Search, Filter, FileX } from 'lucide-react';
+import { CustomSelect } from './CustomSelect';
 
 interface Flashcard {
   id: number;
@@ -120,19 +121,16 @@ export const StudentMemory: React.FC = () => {
             />
           </div>
 
-          <div className="relative sm:w-64">
-            <Filter className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-            <select
-              value={selectedTopic}
-              onChange={(e) => { setSelectedTopic(e.target.value); setCurrentIndex(0); }}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
-            >
-              <option value="all">All Topics ({flashcards.length})</option>
-              {topics.map(topic => (
-                <option key={topic} value={topic}>{topic}</option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            className="sm:w-64"
+            value={selectedTopic}
+            onChange={(v) => { setSelectedTopic(v); setCurrentIndex(0); }}
+            icon={<Filter className="w-4 h-4" />}
+            options={[
+              { value: 'all', label: `All Topics (${flashcards.length})` },
+              ...topics.map((topic) => ({ value: topic, label: topic })),
+            ]}
+          />
         </div>
       )}
 

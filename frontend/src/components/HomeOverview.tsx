@@ -25,7 +25,14 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
     const fetchOverviewData = async () => {
       try {
         const [docsRes, memoryRes, analyticsRes] = await Promise.all([
-          apiClient.get('/documents/'),
+          // No trailing slash - the documents router is declared as
+          // prefix="/documents" with route "", so the real path is
+          // "/api/documents". The trailing-slash version worked by
+          // accident via a 307 redirect that axios silently followed,
+          // but that's an extra unnecessary round-trip and a fragile
+          // dependency on the browser/axios forwarding CORS headers
+          // through the redirect correctly.
+          apiClient.get('/documents'),
           apiClient.get('/memory/due'),
           apiClient.get('/analytics/summary')
         ]);
