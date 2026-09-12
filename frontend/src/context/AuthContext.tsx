@@ -1,64 +1,67 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 
-export interface User {
+interface User {
   id: number;
   email: string;
-  name?: string;
-  full_name?: string;
+  name: string;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  isLoading: boolean;
   login: (token: string, userData: User) => void;
   logout: () => void;
-  isLoading: boolean;
+  updateUser: (userData: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
-  const [isLoading, setIsLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const initAuth = async () => {
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        try {
-          const res = await apiClient.get<User>('/auth/me');
-          setUser(res.data);
-          setToken(storedToken);
-        } catch (err) {
-          console.error('Session expired or invalid', err);
-          localStorage.removeItem('token');
-          setToken(null);
-          setUser(null);
-        }
+    const fetchCurrentUser = async () => {
+      if (!token) {
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
+      try {
+        const res = await apiClient.get<User>('/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUser(res.data);
+      } catch (err) {
+        console.error('Failed to authenticate session', err);
+        logout();
+      } finally {
+        setIsLoading(false);
+      }
     };
-
-    initAuth();
-  }, []);
+    fetchCurrentUser();
+  }, [token]);
 
   const login = (newToken: string, userData: User) => {
-    localStorage.setItem('token', newToken);
+    localStorage.setItem('access_token', newToken);
     setToken(newToken);
     setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('studyvault_chat_history');
+    localStorage.removeItem('access_token');
     setToken(null);
     setUser(null);
   };
 
+  const updateUser = (userData: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...userData } : null));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

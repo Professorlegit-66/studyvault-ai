@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { apiClient } from '../api/client';
-import { FileText, FileCode, FileSpreadsheet, File, Upload, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
+import { FileText, Upload, Sparkles, Trash2, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export interface Document {
   id: number;
-  title?: string;
-  file_path?: string;
-  created_at: string;
+  title: string;
+  file_type: string;
+  created_at?: string;
 }
 
 interface DocumentManagerProps {
@@ -17,57 +17,82 @@ interface DocumentManagerProps {
 export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onDocumentsChange }) => {
   const [uploading, setUploading] = useState(false);
   const [generatingId, setGeneratingId] = useState<number | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', files[0]);
 
+    setUploading(true);
     try {
-      setUploading(true);
       await apiClient.post('/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       onDocumentsChange();
     } catch (err) {
-      console.error('Upload failed', err);
+      console.error('Failed to upload document', err);
+      alert('Failed to upload document.');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleGenerateFlashcards = async (documentId: number) => {
+  const generateFlashcards = async (docId: number) => {
+    setGeneratingId(docId);
+    setSuccessMsg(null);
     try {
-      setGeneratingId(documentId);
-      setMessage(null);
-      const res = await apiClient.post(`/memory/generate/${documentId}`);
-      setMessage(res.data.message || 'Flashcards generated successfully!');
-    } catch (err) {
+      const res = await apiClient.post(`/memory/generate/${docId}`);
+      setSuccessMsg(res.data.message || 'Flashcards successfully generated! Check Student Memory.');
+      setTimeout(() => setSuccessMsg(null), 5000);
+    } catch (err: any) {
       console.error('Failed to generate flashcards', err);
-      setMessage('Failed to generate flashcards. Please check your AI configuration.');
+      const errorMsg = err.response?.data?.detail || 'Failed to generate flashcards.';
+      alert(errorMsg);
     } finally {
       setGeneratingId(null);
     }
   };
 
-  const getFileIcon = (filename: string = '') => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'pdf':
-        return { icon: FileText, color: 'text-rose-500 bg-rose-500/10 border-rose-500/20', label: 'PDF' };
-      case 'docx':
-      case 'doc':
-        return { icon: FileText, color: 'text-blue-500 bg-blue-500/10 border-blue-500/20', label: 'DOC' };
-      case 'txt':
-        return { icon: FileCode, color: 'text-amber-500 bg-amber-500/10 border-amber-500/20', label: 'TXT' };
-      case 'csv':
-      case 'xlsx':
-        return { icon: FileSpreadsheet, color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20', label: 'DATA' };
-      default:
-        return { icon: File, color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20', label: ext?.toUpperCase() || 'FILE' };
+  const toggleSelectAll = () => {
+    if (selectedIds.length === documents.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(documents.map(d => d.id));
+    }
+  };
+
+  const toggleSelectDoc = (id: number) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(i => i !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+
+    setDeleting(true);
+    try {
+      for (const id of selectedIds) {
+        await apiClient.delete(`/documents/${id}`);
+      }
+      setSelectedIds([]);
+      setIsSelectMode(false);
+      setShowConfirm(false);
+      onDocumentsChange();
+    } catch (err) {
+      console.error('Failed to delete documents', err);
+      alert('Failed to delete some documents.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -75,69 +100,145 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-bold text-xl text-slate-900 dark:text-slate-100">Documents Vault</h3>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Documents Vault</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">Upload study notes and generate AI-powered flashcards.</p>
         </div>
+        <div className="flex items-center gap-3">
+          {documents.length > 0 && (
+            <button
+              onClick={() => {
+                setIsSelectMode(!isSelectMode);
+                setSelectedIds([]);
+                setShowConfirm(false);
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer border ${
+                isSelectMode 
+                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-500' 
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>{isSelectMode ? 'Cancel Selection' : 'Delete Documents'}</span>
+            </button>
+          )}
 
-        <label className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-colors cursor-pointer shadow-lg shadow-indigo-600/20">
-          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-          <span>Upload Document</span>
-          <input type="file" onChange={handleFileUpload} className="hidden" accept=".pdf,.txt,.docx" />
-        </label>
+          <label className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer shadow-lg shadow-indigo-600/30">
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            <span>{uploading ? 'Uploading...' : 'Upload Document'}</span>
+            <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+          </label>
+        </div>
       </div>
 
-      {message && (
-        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl text-sm font-medium flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>{message}</span>
+      {successMsg && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-xl flex items-center gap-3 text-emerald-500 dark:text-emerald-400 text-sm font-medium">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <span>{successMsg}</span>
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xl">
-        {documents.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
-            No documents uploaded yet. Upload a PDF or TXT file to get started.
+      {isSelectMode && documents.length > 0 && (
+        <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-900 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800">
+          <button
+            onClick={toggleSelectAll}
+            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+          >
+            {selectedIds.length === documents.length ? 'Deselect All' : 'Select All'} ({selectedIds.length} selected)
+          </button>
+          <button
+            onClick={() => setShowConfirm(true)}
+            disabled={selectedIds.length === 0 || deleting}
+            className="flex items-center gap-2 px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Selected</span>
+          </button>
+        </div>
+      )}
+
+      {showConfirm && (
+        <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-3 text-rose-500 dark:text-rose-400 text-sm font-medium">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>Are you sure you want to delete {selectedIds.length} selected document(s)? This cannot be undone.</span>
           </div>
-        ) : (
-          <div className="divide-y divide-slate-200 dark:divide-slate-700/60">
-            {documents.map((doc) => {
-              const name = doc.title || `Document #${doc.id}`;
-              const fileMeta = getFileIcon(name);
-              const IconComponent = fileMeta.icon;
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowConfirm(false)}
+              className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteSelected}
+              disabled={deleting}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50"
+            >
+              {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Yes, Delete</span>
+            </button>
+          </div>
+        </div>
+      )}
 
-              return (
-                <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                  <div className="flex items-center gap-3.5">
-                    <div className={`p-2.5 rounded-xl border ${fileMeta.color} relative flex items-center justify-center`}>
-                      <IconComponent className="w-5 h-5" />
-                      <span className="absolute -bottom-1 -right-1 text-[9px] font-extrabold px-1 bg-slate-900 text-slate-100 rounded">
-                        {fileMeta.label}
-                      </span>
+      {documents.length === 0 ? (
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center space-y-4 shadow-xl">
+          <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 rounded-full flex items-center justify-center mx-auto">
+            <FileText className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">No documents uploaded yet</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            Upload text, PDF, or Word files to start chatting with your AI tutor and generating flashcards.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-200 dark:divide-slate-700">
+          {documents.map((doc) => {
+            const isSelected = selectedIds.includes(doc.id);
+            return (
+              <div
+                key={doc.id}
+                onClick={() => isSelectMode && toggleSelectDoc(doc.id)}
+                className={`p-4 flex items-center justify-between transition-colors ${
+                  isSelectMode ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50' : ''
+                } ${isSelected ? 'bg-indigo-500/5 dark:bg-indigo-500/10' : ''}`}
+              >
+                <div className="flex items-center gap-3">
+                  {isSelectMode && (
+                    <div className="text-indigo-600 dark:text-indigo-400">
+                      {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-slate-400" />}
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{name}</p>
-                      <p className="text-xs text-slate-400">Added on {new Date(doc.created_at).toLocaleDateString()}</p>
-                    </div>
+                  )}
+                  <div className="p-2.5 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                    <FileText className="w-5 h-5" />
                   </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Added {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Recently'}
+                    </p>
+                  </div>
+                </div>
 
+                {!isSelectMode && (
                   <button
+                    onClick={() => generateFlashcards(doc.id)}
                     disabled={generatingId === doc.id}
-                    onClick={() => handleGenerateFlashcards(doc.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 border border-slate-200 dark:border-slate-700"
                   >
                     {generatingId === doc.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
                     ) : (
-                      <Sparkles className="w-3.5 h-3.5" />
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
                     )}
                     <span>Generate Flashcards</span>
                   </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

@@ -18,6 +18,11 @@ class UserCreate(BaseModel):
     name: Optional[str] = None
     full_name: Optional[str] = None
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+
 class UserResponse(BaseModel):
     id: int
     email: str
@@ -71,4 +76,21 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.put("/me", response_model=UserResponse)
+async def update_user_profile(
+    payload: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if payload.name:
+        current_user.name = payload.name
+    if payload.email:
+        current_user.email = payload.email
+    if payload.password:
+        current_user.hashed_password = get_password_hash(payload.password)
+        
+    await db.commit()
+    await db.refresh(current_user)
     return current_user

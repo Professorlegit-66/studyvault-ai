@@ -8,12 +8,17 @@ import { AITutorChat } from '../components/AITutorChat';
 import type { Message } from '../components/AITutorChat';
 import { LayoutDashboard, FileText, Brain, MessageSquare, Sun, Moon, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+  onOpenProfile?: () => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
   const { user, logout } = useAuth() as { user: { name?: string; username?: string; email?: string } | null; logout: () => void };
+  const { isDarkMode, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'home' | 'documents' | 'memory' | 'chat'>('home');
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -33,18 +38,10 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDocuments();
-    document.documentElement.classList.add('dark');
   }, []);
 
-  const toggleTheme = () => {
-    const nextMode = !isDarkMode;
-    setIsDarkMode(nextMode);
-    if (nextMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  };
+  // Directly evaluate user name properties reactively
+  const displayName = user?.name || user?.username || user?.email?.split('@')[0] || 'Student';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300">
@@ -147,15 +144,19 @@ export const Dashboard: React.FC = () => {
             </div>
           </button>
 
-          <span className="text-sm text-slate-500 dark:text-slate-400">
-            Welcome, <span className="font-semibold text-slate-900 dark:text-slate-100">{user?.username || user?.name || user?.email?.split('@')[0] || 'Student'}</span>
-          </span>
+          <button
+            onClick={onOpenProfile}
+            className="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors cursor-pointer bg-slate-100 dark:bg-slate-900 px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800"
+            title="View Profile & Statistics"
+          >
+            Welcome, <span className="font-semibold text-slate-900 dark:text-slate-100">{displayName}</span>
+          </button>
         </div>
 
         <div className="max-w-5xl mx-auto">
           {activeTab === 'home' && (
             <HomeOverview
-              userName={user?.username || user?.name || user?.email?.split('@')[0] || 'Student'}
+              userName={displayName}
               documentCount={documents.length}
               onNavigate={(tab) => setActiveTab(tab as any)}
             />
