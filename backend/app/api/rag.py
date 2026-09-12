@@ -104,7 +104,7 @@ User Question: {request.query}
 
         # Generate response disabling function calling to eliminate log warnings
         gen_res = client.models.generate_content(
-            model="gemini-3.6-flash",
+            model="gemini-3.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.3,

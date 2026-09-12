@@ -4,77 +4,61 @@ import { apiClient } from '../api/client';
 export interface User {
   id: number;
   email: string;
-  name: string;
+  name?: string;
+  full_name?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (token: string, userData: User) => void;
   logout: () => void;
+  isLoading: boolean;
 }
-
-const TOKEN_KEY = 'studyvault_token';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  const fetchCurrentUser = async (currentToken: string) => {
-    try {
-      const response = await apiClient.get<User>('/auth/me', {
-        headers: { Authorization: `Bearer ${currentToken}` },
-      });
-      setUser(response.data);
-    } catch (err) {
-      console.error('Failed to fetch user', err);
-      logout();
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      fetchCurrentUser(token);
-    } else {
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        try {
+          const res = await apiClient.get<User>('/auth/me');
+          setUser(res.data);
+          setToken(storedToken);
+        } catch (err) {
+          console.error('Session expired or invalid', err);
+          localStorage.removeItem('token');
+          setToken(null);
+          setUser(null);
+        }
+      }
       setIsLoading(false);
-    }
-  }, [token]);
+    };
 
-  const login = async (email: string, password: string) => {
-    const params = new URLSearchParams();
-    params.append('username', email);
-    params.append('password', password);
+    initAuth();
+  }, []);
 
-    const response = await apiClient.post('/auth/login', params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-
-    const newToken = response.data.access_token;
-    localStorage.setItem(TOKEN_KEY, newToken);
+  const login = (newToken: string, userData: User) => {
+    localStorage.setItem('token', newToken);
     setToken(newToken);
-    await fetchCurrentUser(newToken);
-  };
-
-  const register = async (name: string, email: string, password: string) => {
-    await apiClient.post('/auth/register', { name, email, password });
-    await login(email, password);
+    setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('token');
+    localStorage.removeItem('studyvault_chat_history');
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

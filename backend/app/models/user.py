@@ -7,7 +7,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.document import Document
     from app.models.conversation import Conversation
-    from app.models.student_memory import StudentMemory
+    from app.models.student_memory import Flashcard
 
 class User(Base):
     __tablename__ = "users"
@@ -15,7 +15,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         default=lambda: datetime.now(timezone.utc)
@@ -23,4 +23,4 @@ class User(Base):
 
     documents: Mapped[List["Document"]] = relationship("Document", back_populates="user", cascade="all, delete-orphan")
     conversations: Mapped[List["Conversation"]] = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
-    student_memories: Mapped[List["StudentMemory"]] = relationship("StudentMemory", back_populates="user", cascade="all, delete-orphan")
+    flashcards: Mapped[List["Flashcard"]] = relationship("Flashcard", back_populates="user", cascade="all, delete-orphan")

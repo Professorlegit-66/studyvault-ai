@@ -1,0 +1,140 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from pydantic import BaseModel
+from datetime import datetime, timezone
+from typing import List
+
+from app.database import get_db
+from app.models.document import Document
+from app.models.chunk import DocumentChunk
+from app.models.student_memory import Flashcard
+from app.models.user import User
+from app.api.deps import get_current_user
+from app.services.sm2 import calculate_sm2
+from app.services.flashcard_gen import generate_flashcards_from_text
+
+router = APIRouter(prefix="/api/memory", tags=["student-memory"])
+
+
+class ReviewRequest(BaseModel):
+    quality: int  # 0 to 5 rating
+
+
+class FlashcardResponse(BaseModel):
+    id: int
+    topic: str
+    question: str
+    answer: str
+    repetition_number: int
+    interval_days: int
+    ease_factor: float
+    next_review_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/due", response_model=List[FlashcardResponse])
+async def get_due_flashcards(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    now = datetime.now(timezone.utc)
+    stmt = select(Flashcard).where(
+        Flashcard.user_id == current_user.id,
+        Flashcard.next_review_at <= now,
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+@router.post("/review/{card_id}", response_model=FlashcardResponse)
+async def review_flashcard(
+    card_id: int,
+    payload: ReviewRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(Flashcard).where(
+        Flashcard.id == card_id,
+        Flashcard.user_id == current_user.id,
+    )
+    card = (await db.execute(stmt)).scalar_one_or_none()
+    if not card:
+        raise HTTPException(status_code=404, detail="Flashcard not found")
+
+    rep, interval, ef, next_review = calculate_sm2(
+        quality=payload.quality,
+        repetition=card.repetition_number,
+        interval=card.interval_days,
+        ease_factor=card.ease_factor,
+    )
+
+    card.repetition_number = rep
+    card.interval_days = interval
+    card.ease_factor = ef
+    card.next_review_at = next_review
+    card.last_reviewed_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(card)
+    return card
+
+
+@router.post("/generate/{document_id}")
+async def generate_cards_for_doc(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    doc = (
+        await db.execute(
+            select(Document).where(
+                Document.id == document_id, Document.user_id == current_user.id
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        # Pull real extracted text from chunks (same source used for RAG Q&A)
+        # instead of a generic placeholder, so flashcards are actually grounded.
+        chunk_rows = (
+            await db.execute(
+                select(DocumentChunk.content)
+                .where(DocumentChunk.document_id == doc.id)
+                .order_by(DocumentChunk.chunk_index)
+            )
+        ).scalars().all()
+
+        raw_text = (
+            "\n".join(chunk_rows)
+            if chunk_rows
+            else f"Study notes and key concepts regarding {doc.title}."
+        )
+
+        cards_data = await generate_flashcards_from_text(raw_text, topic=doc.title)
+
+        created_cards = []
+        for item in cards_data:
+            card = Flashcard(
+                user_id=current_user.id,
+                document_id=doc.id,
+                topic=doc.title,
+                question=item.get("question", "Review concept"),
+                answer=item.get("answer", "Refer to document notes."),
+            )
+            db.add(card)
+            created_cards.append(card)
+
+        await db.commit()
+        return {
+            "message": f"Successfully generated {len(created_cards)} flashcards!",
+            "count": len(created_cards),
+        }
+    except Exception as e:
+        print(f"Flashcard generation router error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
