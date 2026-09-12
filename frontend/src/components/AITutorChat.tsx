@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { apiClient } from '../api/client';
 import type { Document } from './DocumentManager';
 import { Send, Bot, User, Loader2, Sparkles, BookOpen, Filter } from 'lucide-react';
+import { CustomSelect } from './CustomSelect';
 
 export interface Message {
   sender: 'user' | 'ai';
@@ -86,23 +87,16 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-          <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          <select
-            value={selectedDocId}
-            onChange={(e) => setSelectedDocId(e.target.value)}
-            className="bg-transparent text-xs text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
-          >
-            <option value="all" className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
-              All Vault Documents
-            </option>
-            {documents.map((doc) => (
-              <option key={doc.id} value={doc.id} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
-                {doc.title}
-              </option>
-            ))}
-          </select>
-        </div>
+        <CustomSelect
+          className="w-56"
+          value={selectedDocId}
+          onChange={(v) => setSelectedDocId(v)}
+          icon={<Filter className="w-3.5 h-3.5" />}
+          options={[
+            { value: 'all', label: 'All Vault Documents' },
+            ...documents.map((doc) => ({ value: String(doc.id), label: doc.title })),
+          ]}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4 scrollbar-thin">

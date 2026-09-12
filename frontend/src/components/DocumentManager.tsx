@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
 import { apiClient } from '../api/client';
-import { FileText, Upload, Sparkles, Trash2, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, Eye, X } from 'lucide-react';
+import { FileText, Upload, Sparkles, Trash2, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, Eye, X, Search, ArrowUpDown } from 'lucide-react';
 import { PdfViewer } from './PdfViewer';
 import { TextViewer } from './TextViewer';
+import { CustomSelect } from './CustomSelect';
 
 export interface Document {
   id: number;
   title: string;
   file_type?: string;
   file_path?: string;
+  file_size?: number;
   created_at?: string;
 }
+
+type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'size-desc' | 'size-asc';
+
+const formatFileSize = (bytes?: number): string => {
+  if (bytes === undefined || bytes === null) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 interface DocumentManagerProps {
   documents: Document[];
@@ -26,6 +37,8 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
   const [deleting, setDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState<SortOption>('date-desc');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -81,10 +94,10 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === documents.length) {
+    if (selectedIds.length === displayedDocuments.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(documents.map(d => d.id));
+      setSelectedIds(displayedDocuments.map(d => d.id));
     }
   };
 
@@ -115,6 +128,27 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
       setDeleting(false);
     }
   };
+
+  const displayedDocuments = documents
+    .filter((doc) => doc.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      switch (sortOption) {
+        case 'name-asc':
+          return a.title.localeCompare(b.title);
+        case 'name-desc':
+          return b.title.localeCompare(a.title);
+        case 'size-asc':
+          return (a.file_size ?? 0) - (b.file_size ?? 0);
+        case 'size-desc':
+          return (b.file_size ?? 0) - (a.file_size ?? 0);
+        case 'date-asc':
+          return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime();
+        case 'date-desc':
+        default:
+          return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+      }
+    });
 
   return (
     <div className="space-y-6">
@@ -163,7 +197,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
             onClick={toggleSelectAll}
             className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
           >
-            {selectedIds.length === documents.length ? 'Deselect All' : 'Select All'} ({selectedIds.length} selected)
+            {selectedIds.length === displayedDocuments.length ? 'Deselect All' : 'Select All'} ({selectedIds.length} selected)
           </button>
           <button
             onClick={() => setShowConfirm(true)}
@@ -212,8 +246,45 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
           </p>
         </div>
       ) : (
+        <>
+          <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search documents by name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <CustomSelect
+              className="sm:w-64"
+              value={sortOption}
+              onChange={(v) => setSortOption(v as SortOption)}
+              icon={<ArrowUpDown className="w-4 h-4" />}
+              options={[
+                { value: 'date-desc', label: 'Date (Newest first)' },
+                { value: 'date-asc', label: 'Date (Oldest first)' },
+                { value: 'name-asc', label: 'Name (A → Z)' },
+                { value: 'name-desc', label: 'Name (Z → A)' },
+                { value: 'size-desc', label: 'Size (Largest first)' },
+                { value: 'size-asc', label: 'Size (Smallest first)' },
+              ]}
+            />
+          </div>
+
+          {displayedDocuments.length === 0 ? (
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center space-y-4 shadow-xl">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">No matching documents</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                Try a different search term.
+              </p>
+            </div>
+          ) : (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-200 dark:divide-slate-700">
-          {documents.map((doc) => {
+          {displayedDocuments.map((doc) => {
             const isSelected = selectedIds.includes(doc.id);
             const isViewable = doc.title.toLowerCase().endsWith('.pdf') ||
                    doc.title.toLowerCase().endsWith('.txt') ||
@@ -240,6 +311,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
                     <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</h4>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       Added {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Recently'}
+                      {doc.file_size !== undefined && ` • ${formatFileSize(doc.file_size)}`}
                     </p>
                   </div>
                 </div>
@@ -278,7 +350,9 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
               </div>
             );
           })}
-        </div>
+            </div>
+          )}
+        </>
       )}
 
       {selectedDoc && (
