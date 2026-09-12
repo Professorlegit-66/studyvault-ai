@@ -32,12 +32,6 @@ class FlashcardResponse(BaseModel):
     topic: str
     question: str
     answer: str
-    # Needed so the frontend can tell "card's source document still exists"
-    # (a real int) apart from "card is detached, e.g. source doc was deleted
-    # or this was generated from a snippet" (null). Without this field the
-    # frontend never receives document_id at all, so `card.document_id == null`
-    # is always true (undefined == null), which was making every card show
-    # as "Document removed" regardless of actual state.
     document_id: Optional[int] = None
     repetition_number: int
     interval_days: int
