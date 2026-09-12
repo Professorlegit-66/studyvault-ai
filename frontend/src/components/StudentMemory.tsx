@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { Brain, Download, CheckCircle, RotateCw, RefreshCw, Search, Filter } from 'lucide-react';
+import { Brain, Download, CheckCircle, RotateCw, RefreshCw, Search, Filter, FileX } from 'lucide-react';
 
 interface Flashcard {
   id: number;
   question: string;
   answer: string;
   topic?: string;
+  document_id?: number | null;
   repetition_number?: number;
   interval_days?: number;
 }
@@ -155,7 +156,18 @@ export const StudentMemory: React.FC = () => {
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 shadow-xl max-w-2xl mx-auto space-y-6">
           <div className="flex justify-between items-center text-xs font-medium text-slate-400 uppercase tracking-wider">
             <span>Card {currentIndex + 1} of {filteredCards.length}</span>
-            <span>{filteredCards[currentIndex].topic || 'General Vault'}</span>
+            <div className="flex items-center gap-2">
+              <span>{filteredCards[currentIndex].topic || 'General Vault'}</span>
+              {filteredCards[currentIndex].document_id == null && (
+                <span
+                  className="flex items-center gap-1 px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-full normal-case font-normal"
+                  title="The original document for this card has been removed, but your review progress is kept."
+                >
+                  <FileX className="w-3 h-3" />
+                  Document removed
+                </span>
+              )}
+            </div>
           </div>
 
           <div 

@@ -13,7 +13,15 @@ class Flashcard(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), nullable=True)
+    # document_id is intentionally nullable and uses ON DELETE SET NULL, not
+    # CASCADE: deleting a document should NOT wipe out flashcards generated
+    # from it. Those cards carry real SM-2 review progress (repetition_number,
+    # ease_factor, next_review_at) earned by the user studying them - that's
+    # worth more than the source document, which may just be getting tidied
+    # up or removed as a duplicate. A card with document_id = NULL is a
+    # normal, supported "detached" state (same as snippet-generated cards,
+    # which never had a document_id in the first place).
+    document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
     
     topic: Mapped[str] = mapped_column(String(150), nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
