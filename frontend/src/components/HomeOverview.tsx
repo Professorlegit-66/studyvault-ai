@@ -18,19 +18,24 @@ interface ActivityItem {
 export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCount, onNavigate }) => {
   const [recentDocs, setRecentDocs] = useState<ActivityItem[]>([]);
   const [cardCount, setCardCount] = useState(0);
+  const [masteryPercent, setMasteryPercent] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchOverviewData = async () => {
       try {
-        const [docsRes, memoryRes] = await Promise.all([
+        const [docsRes, memoryRes, analyticsRes] = await Promise.all([
           apiClient.get('/documents/'),
-          apiClient.get('/memory/due')
+          apiClient.get('/memory/due'),
+          apiClient.get('/analytics/summary')
         ]);
         if (Array.isArray(docsRes.data)) {
           setRecentDocs(docsRes.data.slice(0, 5));
         }
         if (Array.isArray(memoryRes.data)) {
           setCardCount(memoryRes.data.length);
+        }
+        if (analyticsRes.data && typeof analyticsRes.data.retention_score === 'number') {
+          setMasteryPercent(analyticsRes.data.retention_score);
         }
       } catch (err) {
         console.error('Failed to load overview data', err);
@@ -83,7 +88,9 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
             <Activity className="w-5 h-5" />
             <span className="text-xs font-semibold px-2 py-0.5 bg-rose-500/10 rounded-full">Retention</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">85%</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">
+            {masteryPercent !== null ? `${masteryPercent}%` : '—'}
+          </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">Estimated Mastery</p>
         </div>
       </div>
