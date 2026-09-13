@@ -5,4 +5,38 @@
   html, body {
     @apply bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300;
   }
+
+  /* Tells the browser which native UI (scrollbars, form controls, etc.) to
+     use for each theme, so scrollbars aren't stuck light regardless of
+     the app's own dark mode toggle. */
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+}
+
+/* Custom scrollbar styling (Chromium-based browsers: Chrome, Edge, Brave).
+   Matches the slate palette used throughout the app instead of relying
+   purely on color-scheme, which only gives a generic native look. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgb(148 163 184 / 0.5); /* slate-400 @ 50% */
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(148 163 184 / 0.8);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgb(71 85 105 / 0.6); /* slate-600 @ 60% */
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(71 85 105 / 0.9);
 }
