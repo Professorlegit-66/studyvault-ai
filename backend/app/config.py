@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     GMAIL_ADDRESS: Optional[str] = None
     GMAIL_APP_PASSWORD: Optional[str] = None
 
+    # Brevo (transactional email over HTTPS) - replaces raw Gmail SMTP.
+    # Render's outbound network blocks/times out on SMTP ports (587/465),
+    # so verification emails are sent via Brevo's HTTP API instead, which
+    # travels over port 443 like any other API call and isn't affected by
+    # that restriction. BREVO_FROM_EMAIL must be a sender address verified
+    # in the Brevo dashboard (Senders, Domains & Dedicated IPs -> Senders).
+    BREVO_API_KEY: Optional[str] = None
+    BREVO_FROM_EMAIL: Optional[str] = None
+
     # CORS_ORIGINS is read as a JSON array string from the environment, e.g.
     # CORS_ORIGINS=["https://your-app.vercel.app","http://localhost:5173"]
     # pydantic-settings parses this automatically for List[str] fields.
