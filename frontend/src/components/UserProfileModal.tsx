@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { FileText, Brain, X, Shield, Edit3, CheckCircle2, Loader2 } from 'lucide-react';
+import { FileText, Brain, X, Shield, Edit3, CheckCircle2, Loader2, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface UserProfileModalProps {
@@ -21,6 +21,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // --- Email-change verification (PUT /me stages the new address; it
+  // isn't live until confirmed here via POST /auth/confirm-email-change) ---
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+
   useEffect(() => {
     if (isOpen) {
       setName(username || '');
@@ -28,6 +37,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
       setPassword('');
       setIsEditing(false);
       setSuccess(false);
+      setPendingEmail(null);
+      setOtpCode('');
+      setConfirmError('');
+      setResendMessage('');
       fetchUserStats();
     }
   }, [isOpen, username, userEmail]);
@@ -60,17 +73,76 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
       }
 
       const res = await apiClient.put('/auth/me', payload);
+
+      // Name/password land immediately. Email does NOT - if it changed,
+      // the backend leaves user.email untouched and stages the new address
+      // in pending_email until the OTP sent to it is confirmed.
       updateUser({ name: res.data.name, email: res.data.email });
-      setSuccess(true);
-      setIsEditing(false);
+
+      if (res.data.pending_email) {
+        setPendingEmail(res.data.pending_email);
+        setOtpCode('');
+        setConfirmError('');
+      } else {
+        setSuccess(true);
+        setIsEditing(false);
+        setTimeout(() => setSuccess(false), 3000);
+      }
       setPassword('');
-      setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       console.error('Failed to update profile', err);
       alert(err.response?.data?.detail || 'Failed to update profile details.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleConfirmEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConfirming(true);
+    setConfirmError('');
+    try {
+      const res = await apiClient.post('/auth/confirm-email-change', { code: otpCode.trim() });
+      updateUser({ name: res.data.name, email: res.data.email });
+      setEmail(res.data.email);
+      setPendingEmail(null);
+      setOtpCode('');
+      setIsEditing(false);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      setConfirmError(err.response?.data?.detail || 'Failed to confirm email change.');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!pendingEmail) return;
+    setResending(true);
+    setResendMessage('');
+    setConfirmError('');
+    try {
+      const res = await apiClient.put('/auth/me', { email: pendingEmail });
+      setPendingEmail(res.data.pending_email || pendingEmail);
+      setResendMessage('A new code has been sent.');
+      setTimeout(() => setResendMessage(''), 4000);
+    } catch (err: any) {
+      setConfirmError(err.response?.data?.detail || 'Failed to resend the code.');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // Backs out of the OTP step locally. Note: the backend's pending_email
+  // stays set until either confirmed or overwritten by a fresh PUT /me -
+  // there's no cancel endpoint yet, so re-editing and resubmitting the
+  // original email would be needed to fully clear it server-side.
+  const handleCancelEmailChange = () => {
+    setPendingEmail(null);
+    setOtpCode('');
+    setConfirmError('');
+    setEmail(userEmail || '');
   };
 
   if (!isOpen) return null;
@@ -94,7 +166,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               </p>
             </div>
           </div>
-          {!isEditing && (
+          {!isEditing && !pendingEmail && (
             <button onClick={() => setIsEditing(true)} className="p-2 bg-slate-100 dark:bg-slate-900 text-indigo-500 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer" title="Edit Profile">
               <Edit3 className="w-4 h-4" />
             </button>
@@ -107,7 +179,58 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
           </div>
         )}
 
-        {isEditing ? (
+        {pendingEmail ? (
+          <form onSubmit={handleConfirmEmailChange} className="space-y-4">
+            <div className="bg-indigo-500/10 border border-indigo-500/30 p-3 rounded-xl flex items-start gap-2 text-indigo-500 dark:text-indigo-300 text-xs font-medium">
+              <Mail className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>We sent a verification code to <strong>{pendingEmail}</strong>. Enter it below to finish changing your email.</span>
+            </div>
+
+            {confirmError && (
+              <div className="bg-red-500/10 border border-red-500/30 p-3 rounded-xl text-red-500 dark:text-red-400 text-xs font-medium">
+                {confirmError}
+              </div>
+            )}
+            {resendMessage && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl text-emerald-400 text-xs font-medium">
+                {resendMessage}
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">Verification Code</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                required
+                autoFocus
+                placeholder="6-digit code"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm tracking-widest text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={resending}
+              className="text-xs font-medium text-indigo-500 hover:text-indigo-400 cursor-pointer disabled:opacity-50"
+            >
+              {resending ? 'Sending...' : "Didn't get a code? Resend"}
+            </button>
+
+            <div className="flex gap-2 pt-2">
+              <button type="button" onClick={handleCancelEmailChange} className="flex-1 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" disabled={confirming || otpCode.trim().length === 0} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-medium flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
+                {confirming && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Confirm Email
+              </button>
+            </div>
+          </form>
+        ) : isEditing ? (
           <form onSubmit={handleSave} className="space-y-4">
             <div>
               <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">Full Name</label>
@@ -128,6 +251,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
               />
+              {email !== userEmail && (
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                  Changing your email will require verifying the new address with a code.
+                </p>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">New Password (leave blank to keep current)</label>
