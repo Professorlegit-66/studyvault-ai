@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from typing import Optional, List
 
 class Settings(BaseSettings):
     APP_NAME: str = "StudyVault AI"
@@ -10,13 +10,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     GEMINI_API_KEY: Optional[str] = None
 
-    # --- Email verification (Gmail SMTP) ---
-    # GMAIL_ADDRESS: the Gmail account emails are sent FROM.
-    # GMAIL_APP_PASSWORD: a 16-character App Password generated at
-    # myaccount.google.com/apppasswords (NOT your normal Gmail password -
-    # Gmail requires 2-Step Verification to be enabled first).
     GMAIL_ADDRESS: Optional[str] = None
     GMAIL_APP_PASSWORD: Optional[str] = None
+
+    # CORS_ORIGINS is read as a JSON array string from the environment, e.g.
+    # CORS_ORIGINS=["https://your-app.vercel.app","http://localhost:5173"]
+    # pydantic-settings parses this automatically for List[str] fields.
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     model_config = SettingsConfigDict(
         env_file=".env",
