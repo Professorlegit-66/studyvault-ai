@@ -14,7 +14,7 @@ from app.models.chunk import DocumentChunk
 from app.models.user import User
 from app.api.auth import get_current_user
 from app.config import settings
-from app.services.document_service import save_uploaded_file, extract_text_from_file
+from app.services.document_service import save_uploaded_file, extract_text_from_file, TextExtractionError
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -116,9 +116,6 @@ async def upload_document(
         raw_text = extract_text_from_file(file_path, f".{ext}")
         text_chunks = chunk_text(raw_text)
 
-        if not text_chunks:
-            print(f"[Upload Warning] No text extracted from file: {file.filename}")
-
         for idx, text_content in enumerate(text_chunks):
             if not text_content.strip():
                 continue
@@ -139,6 +136,18 @@ async def upload_document(
 
         await db.commit()
         print(f"[Upload Success] Created {len(text_chunks)} chunks for document ID {new_doc.id}")
+
+    except TextExtractionError as e:
+        await db.rollback()
+        await db.delete(new_doc)
+        await db.commit()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        print(f"[Upload Rejected] Extraction failed for {file.filename}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        )
 
     except Exception as e:
         await db.rollback()
