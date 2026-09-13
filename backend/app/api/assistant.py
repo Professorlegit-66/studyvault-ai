@@ -1,8 +1,4 @@
 # File: backend/app/api/assistant.py
-# NEW FILE — does not replace anything existing.
-# Router prefix is "/assistant" only; main.py adds "/api" when it registers
-# this router (same convention as documents.py, rag.py, student_memory.py).
-# Full endpoint path will be: POST /api/assistant/query
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -70,11 +66,20 @@ async def query_assistant(
     Pass 1 of the Help Assistant: plain Q&A about how to use the app.
     No action/target/navigation yet — that's Pass 2.
     """
-    response = client.models.generate_content(
-        model="gemini-3.5-flash",
-        contents=f"{APP_KNOWLEDGE}\n\nUser question: {payload.message}",
-    )
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents=f"{APP_KNOWLEDGE}\n\nUser question: {payload.message}",
+        )
+        reply_text = response.text or "Sorry, I couldn't come up with an answer just now."
 
-    reply_text = response.text or "Sorry, I couldn't come up with an answer just now."
+    except Exception as e:
+        error_str = str(e)
+        if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
+            print(f"[Help Assistant] Gemini rate limit hit: {error_str}")
+            reply_text = "I've hit my usage limit for now — please try again in a little while."
+        else:
+            print(f"[Help Assistant] Unexpected error: {error_str}")
+            reply_text = "Sorry, something went wrong on my end. Please try again."
 
     return AssistantQueryResponse(reply=reply_text)
