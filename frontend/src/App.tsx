@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { UserProfileModal } from './components/UserProfileModal';
 import { apiClient } from './api/client';
-import { BookOpen, KeyRound, Mail, User, Loader2, AlertCircle, Sun, Moon } from 'lucide-react';
+import { BookOpen, KeyRound, Mail, User, Loader2, AlertCircle, Sun, Moon, ShieldCheck, RotateCw } from 'lucide-react';
 
 const AuthScreenContent: React.FC = () => {
   const { login } = useAuth();
@@ -16,6 +16,16 @@ const AuthScreenContent: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // After a successful registration, we don't log the user in right away -
+  // the backend requires email verification first. 'authStep' controls
+  // whether we're showing the normal login/register form or the OTP entry
+  // screen; registeredEmail carries the address into the verify request.
+  const [authStep, setAuthStep] = useState<'form' | 'verify'>('form');
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,21 +50,23 @@ const AuthScreenContent: React.FC = () => {
 
         login(token, userRes.data);
       } else {
-        await apiClient.post('/auth/register', {
+        const res = await apiClient.post('/auth/register', {
           email,
           password,
           name,
           full_name: name,
         });
 
-        setSuccess('Account created successfully! Please sign in.');
-        setIsLogin(true);
+        // Move to the verification step instead of bouncing back to login -
+        // the account exists but can't be used until the OTP is confirmed.
+        setRegisteredEmail(res.data.email);
+        setAuthStep('verify');
         setPassword('');
       }
     } catch (err: any) {
       console.error("Auth error details:", err.response);
       let detailMsg = 'Authentication failed. Please check your inputs.';
-      
+
       if (err.response?.data?.detail) {
         if (typeof err.response.data.detail === 'string') {
           detailMsg = err.response.data.detail;
@@ -64,34 +76,142 @@ const AuthScreenContent: React.FC = () => {
       } else if (err.message) {
         detailMsg = err.message;
       }
-      
+
       setError(detailMsg);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setVerifying(true);
+
+    try {
+      const res = await apiClient.post('/auth/verify-email', {
+        email: registeredEmail,
+        code: code.trim(),
+      });
+
+      const token = res.data.access_token;
+      const userRes = await apiClient.get('/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      login(token, userRes.data);
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Verification failed. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setError(null);
+    setSuccess(null);
+    setResending(true);
+    try {
+      await apiClient.post('/auth/resend-verification', { email: registeredEmail });
+      setSuccess('A new code has been sent to your email.');
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Failed to resend the code. Please try again.');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const ThemeToggle = (
+    <div className="absolute top-6 right-6">
+      <button
+        onClick={toggleTheme}
+        aria-label="Toggle Theme"
+        className="relative flex items-center w-16 h-8 p-1 bg-slate-200 dark:bg-slate-900 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer border border-slate-300 dark:border-slate-800 shadow-sm"
+      >
+        <div
+          className={`flex items-center justify-center w-6 h-6 bg-white dark:bg-slate-800 rounded-full shadow-md transform transition-transform duration-300 ${
+            isDarkMode ? 'translate-x-8 text-slate-200' : 'translate-x-0 text-amber-500'
+          }`}
+        >
+          {isDarkMode ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+        </div>
+        <div className="absolute inset-0 flex justify-between items-center px-2 pointer-events-none text-slate-400 dark:text-slate-600">
+          <Sun className="w-3.5 h-3.5" />
+          <Moon className="w-3.5 h-3.5" />
+        </div>
+      </button>
+    </div>
+  );
+
+  if (authStep === 'verify') {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 relative transition-colors duration-300">
+        {ThemeToggle}
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300">
+          <div className="flex flex-col items-center mb-6">
+            <div className="p-2.5 bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 rounded-xl mb-3">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <h1 className="text-lg font-semibold text-slate-700 dark:text-slate-200 text-center">Verify your email</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center">
+              We sent a 6-digit code to <span className="text-slate-700 dark:text-slate-200">{registeredEmail}</span>
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-xs rounded-xl flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span className="break-all">{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs rounded-xl text-center font-medium">
+              {success}
+            </div>
+          )}
+
+          <form onSubmit={handleVerify} className="space-y-4">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              placeholder="000000"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-center text-lg tracking-[0.3em] text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+            />
+
+            <button
+              type="submit"
+              disabled={verifying || code.length !== 6}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/30 disabled:opacity-50"
+            >
+              {verifying && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>Verify & Continue</span>
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={handleResend}
+              disabled={resending}
+              className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <RotateCw className={`w-3 h-3 ${resending ? 'animate-spin' : ''}`} />
+              {resending ? 'Sending...' : "Didn't get a code? Resend"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 relative transition-colors duration-300">
-      <div className="absolute top-6 right-6">
-        <button
-          onClick={toggleTheme}
-          aria-label="Toggle Theme"
-          className="relative flex items-center w-16 h-8 p-1 bg-slate-200 dark:bg-slate-900 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer border border-slate-300 dark:border-slate-800 shadow-sm"
-        >
-          <div
-            className={`flex items-center justify-center w-6 h-6 bg-white dark:bg-slate-800 rounded-full shadow-md transform transition-transform duration-300 ${
-              isDarkMode ? 'translate-x-8 text-slate-200' : 'translate-x-0 text-amber-500'
-            }`}
-          >
-            {isDarkMode ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
-          </div>
-          <div className="absolute inset-0 flex justify-between items-center px-2 pointer-events-none text-slate-400 dark:text-slate-600">
-            <Sun className="w-3.5 h-3.5" />
-            <Moon className="w-3.5 h-3.5" />
-          </div>
-        </button>
-      </div>
+      {ThemeToggle}
 
       <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300">
         <div className="flex items-center justify-center gap-3 mb-6">
@@ -203,10 +323,10 @@ const AppContent: React.FC = () => {
   return (
     <>
       <Dashboard onOpenProfile={() => setIsProfileOpen(true)} />
-      <UserProfileModal 
-        isOpen={isProfileOpen} 
-        onClose={() => setIsProfileOpen(false)} 
-        username={user.name || user.email || 'Student User'} 
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        username={user.name || user.email || 'Student User'}
         userEmail={user.email || ''}
       />
     </>

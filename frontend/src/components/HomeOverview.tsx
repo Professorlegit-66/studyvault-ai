@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { Brain, FileText, Sparkles, ArrowRight, Flame, Activity, Clock } from 'lucide-react';
+import { Brain, FileText, ArrowRight, Flame, Activity, Clock } from 'lucide-react';
 
 interface HomeOverviewProps {
   userName: string;

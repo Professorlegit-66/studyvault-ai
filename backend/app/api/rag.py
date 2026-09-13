@@ -114,6 +114,24 @@ User Question: {request.query}
         return ChatResponse(answer=gen_res.text, sources=sources)
 
     except Exception as e:
+        error_str = str(e)
+
+        # Same pattern as companion.py (bug #13): Gemini's free-tier quota
+        # (~20 requests/window) gets hit during normal dev/testing and raises
+        # a 429 RESOURCE_EXHAUSTED ClientError. Left uncaught, this fell
+        # through to the generic 500 handler below, which the frontend then
+        # showed as a misleading "check your connection or uploaded files"
+        # message - actively wrong advice for a quota issue. Instead, return
+        # a normal 200 with an honest in-character message, same as
+        # companion.py does, so it just appears as a graceful chat reply
+        # rather than a crash.
+        if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
+            print(f"[RAG Chat] Gemini rate limit hit: {error_str}")
+            return ChatResponse(
+                answer="I've hit my usage limit for the moment and can't respond right now. Please try again in a little while.",
+                sources=[]
+            )
+
         print("\n=== RAG CHAT ERROR TRACEBACK ===")
         traceback.print_exc()
         print("================================\n")
