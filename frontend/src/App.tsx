@@ -27,6 +27,37 @@ const AuthScreenContent: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
 
+  // Sends a fresh OTP to targetEmail and switches to the verify screen.
+  // Takes the email as a parameter (rather than reading the registeredEmail
+  // state) so it can be called right after login/register discovers the
+  // email, without waiting on a state update to land first. Used both by
+  // the normal post-registration flow and by the "recover an interrupted
+  // registration" path below.
+  const enterVerifyStep = async (targetEmail: string, { autoResend }: { autoResend: boolean }) => {
+    setRegisteredEmail(targetEmail);
+    setAuthStep('verify');
+    setCode('');
+    setError(null);
+    setSuccess(null);
+
+    if (autoResend) {
+      setResending(true);
+      try {
+        await apiClient.post('/auth/resend-verification', { email: targetEmail });
+        setSuccess('Looks like your last registration didn\u2019t finish. We\u2019ve sent a fresh code to your email.');
+      } catch (err: any) {
+        // If resend itself fails (e.g. genuinely already verified, which
+        // login already ruled out, or a transient error), fall back to
+        // just showing the verify screen with its own manual "Resend" button
+        // rather than blocking the user from getting there at all.
+        const detail = err.response?.data?.detail;
+        setError(typeof detail === 'string' ? detail : 'Could not automatically resend a code - use the resend button below.');
+      } finally {
+        setResending(false);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -59,12 +90,40 @@ const AuthScreenContent: React.FC = () => {
 
         // Move to the verification step instead of bouncing back to login -
         // the account exists but can't be used until the OTP is confirmed.
-        setRegisteredEmail(res.data.email);
-        setAuthStep('verify');
+        await enterVerifyStep(res.data.email, { autoResend: false });
         setPassword('');
       }
     } catch (err: any) {
       console.error("Auth error details:", err.response);
+
+      // A 403 from /auth/login is only ever "please verify your email
+      // before logging in" (see api/auth.py) - meaning an account exists
+      // for this email but was never verified. This is the recovery path
+      // for a registration that was interrupted (e.g. a network drop)
+      // before the user ever saw the OTP screen: instead of leaving them
+      // stuck on an error with no way back to entering a code, route them
+      // straight into the verify screen and fire off a fresh code for them.
+      if (isLogin && err.response?.status === 403) {
+        await enterVerifyStep(email, { autoResend: true });
+        setLoading(false);
+        return;
+      }
+
+      // Similarly, registering again with an email that already exists is
+      // the other symptom of the same interrupted-registration scenario
+      // (see the chat/handoff notes) - if the account is genuinely
+      // unverified, sending them to the verify screen is more useful than
+      // a dead-end "email already exists" error. If it's a truly different,
+      // already-verified account, verify-email/resend will fail cleanly
+      // and the existing error UI on that screen still explains why.
+      if (!isLogin && err.response?.status === 400 &&
+          typeof err.response?.data?.detail === 'string' &&
+          err.response.data.detail.toLowerCase().includes('already exists')) {
+        await enterVerifyStep(email, { autoResend: true });
+        setLoading(false);
+        return;
+      }
+
       let detailMsg = 'Authentication failed. Please check your inputs.';
 
       if (err.response?.data?.detail) {
@@ -194,7 +253,7 @@ const AuthScreenContent: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 flex flex-col items-center gap-3">
             <button
               onClick={handleResend}
               disabled={resending}
@@ -202,6 +261,16 @@ const AuthScreenContent: React.FC = () => {
             >
               <RotateCw className={`w-3 h-3 ${resending ? 'animate-spin' : ''}`} />
               {resending ? 'Sending...' : "Didn't get a code? Resend"}
+            </button>
+            <button
+              onClick={() => {
+                setAuthStep('form');
+                setError(null);
+                setSuccess(null);
+              }}
+              className="text-xs text-slate-400 dark:text-slate-500 hover:underline cursor-pointer"
+            >
+              Back to sign in
             </button>
           </div>
         </div>
