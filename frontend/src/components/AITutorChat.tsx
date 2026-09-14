@@ -73,13 +73,13 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col h-[calc(100vh-8rem)] transition-colors duration-300">
-      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl">
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col h-[calc(100vh-8rem)] transition-colors duration-300">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0">
             <Bot className="w-6 h-6" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               AI Tutor Chat <Sparkles className="w-4 h-4 text-amber-500" />
             </h3>
@@ -88,7 +88,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
         </div>
 
         <CustomSelect
-          className="w-56"
+          className="w-full sm:w-56"
           value={selectedDocId}
           onChange={(v) => setSelectedDocId(v)}
           icon={<Filter className="w-3.5 h-3.5" />}

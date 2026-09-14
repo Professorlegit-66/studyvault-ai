@@ -190,9 +190,9 @@ export const AICompanion: React.FC = () => {
   };
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-140px)]">
+    <div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-140px)]">
       {/* Conversation list sidebar */}
-      <div className="w-64 shrink-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
+      <div className="w-full md:w-64 md:shrink-0 max-h-56 md:max-h-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 space-y-2">
           <button
             onClick={handleNewConversation}
@@ -245,7 +245,7 @@ export const AICompanion: React.FC = () => {
       </div>
 
       {/* Chat window */}
-      <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-indigo-500" />
