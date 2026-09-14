@@ -374,13 +374,18 @@ const AuthScreenContent: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isSlowConnection } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-slate-100">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center text-slate-900 dark:text-slate-100 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        {isSlowConnection && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 text-center px-6">
+            Waking up the server — this can take up to a minute on first load.
+          </p>
+        )}
       </div>
     );
   }

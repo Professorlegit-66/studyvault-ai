@@ -2,15 +2,13 @@ import axios from 'axios';
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
+  timeout: 45000, // Render's free tier can take up to ~45-60s to wake from a
+                  // cold start; without a timeout, a slow/stuck wake-up looks
+                  // identical to a frozen app with no way to recover except
+                  // killing the network (see the "stuck loading" bug).
 });
 
 apiClient.interceptors.request.use((config) => {
-  // Must match the key AuthContext.tsx's login()/logout() use ('access_token').
-  // This was previously reading a different, stale key ('token') that was
-  // never updated on login or cleared on logout - causing every data request
-  // (documents, flashcards, analytics, etc.) to silently authenticate as
-  // whichever account last happened to leave a value under 'token', instead
-  // of whoever is actually logged in.
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

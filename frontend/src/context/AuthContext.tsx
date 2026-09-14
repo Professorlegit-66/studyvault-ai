@@ -16,6 +16,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  isSlowConnection: boolean;
   login: (token: string, userData: User) => void;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
@@ -29,25 +30,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Flips true if the initial session check is taking a while - lets the UI
+  // show "waking up the server..." instead of a bare, unexplained spinner
+  // during a slow Render cold start (rather than looking frozen).
+  const [isSlowConnection, setIsSlowConnection] = useState<boolean>(false);
+
   useEffect(() => {
+    let cancelled = false;
+
     const fetchCurrentUser = async () => {
       if (!token) {
         setIsLoading(false);
         return;
       }
+
+      const slowTimer = setTimeout(() => {
+        if (!cancelled) setIsSlowConnection(true);
+      }, 4000);
+
       try {
         const res = await apiClient.get<User>('/auth/me', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setUser(res.data);
-      } catch (err) {
-        console.error('Failed to authenticate session', err);
-        logout();
+        if (!cancelled) setUser(res.data);
+      } catch (err: any) {
+        // A timeout on the FIRST attempt is likely just the cold-start wake-up
+        // request itself timing out - the instance is probably awake now, so
+        // retry once before giving up. A second failure is treated as a
+        // genuinely invalid/expired session.
+        if (err.code === 'ECONNABORTED') {
+          try {
+            const retryRes = await apiClient.get<User>('/auth/me', {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!cancelled) setUser(retryRes.data);
+          } catch (retryErr) {
+            console.error('Failed to authenticate session (after retry)', retryErr);
+            if (!cancelled) logout();
+          }
+        } else {
+          console.error('Failed to authenticate session', err);
+          if (!cancelled) logout();
+        }
       } finally {
-        setIsLoading(false);
+        clearTimeout(slowTimer);
+        if (!cancelled) {
+          setIsLoading(false);
+          setIsSlowConnection(false);
+        }
       }
     };
+
     fetchCurrentUser();
+    return () => { cancelled = true; };
   }, [token]);
 
   const login = (newToken: string, userData: User) => {
@@ -66,18 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser((prev) => (prev ? { ...prev, ...userData } : null));
   };
 
-  // Does NOT log the user in - the backend now requires email verification
-  // (an OTP sent to their inbox) before an account can actually be used.
-  // Registration just creates the account and returns a confirmation
-  // message; the caller (Register.tsx) is responsible for showing a
-  // verification-code step next.
   const register = async (name: string, email: string, password: string): Promise<RegisterResult> => {
     const res = await apiClient.post<RegisterResult>('/auth/register', { name, email, password });
     return res.data;
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, updateUser, register }}>
+    <AuthContext.Provider value={{ user, token, isLoading, isSlowConnection, login, logout, updateUser, register }}>
       {children}
     </AuthContext.Provider>
   );
