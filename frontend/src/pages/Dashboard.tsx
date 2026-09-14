@@ -6,7 +6,7 @@ import type { Document } from '../components/DocumentManager';
 import { StudentMemory } from '../components/StudentMemory';
 import { AITutorChat } from '../components/AITutorChat';
 import type { Message } from '../components/AITutorChat';
-import { LayoutDashboard, FileText, Brain, MessageSquare, Sun, Moon, LogOut, Menu, Sparkles } from 'lucide-react';
+import { LayoutDashboard, FileText, Brain, MessageSquare, Sun, Moon, LogOut, Menu, Sparkles, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import HelpAssistant from '../components/HelpAssistant';
@@ -21,7 +21,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
   const { isDarkMode, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'home' | 'documents' | 'memory' | 'chat' | 'companion'>('home');
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // On desktop this toggles the sidebar between expanded (w-64) and
+  // collapsed-to-icons (w-20), always visible, as before. On mobile
+  // (below the md breakpoint) it instead toggles a slide-in overlay that
+  // sits off-screen by default - previously the sidebar always occupied
+  // real width in the layout's flex row regardless of screen size, which
+  // pushed main content wider than the viewport and caused horizontal
+  // scrolling on phones (see the mobile layout bug).
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: 'ai',
@@ -42,15 +51,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
     fetchDocuments();
   }, []);
 
-  // Directly evaluate user name properties reactively
+  // Closes the mobile overlay automatically after picking a tab, so the
+  // user doesn't have to separately dismiss the menu every time - desktop
+  // behavior (sidebar stays as-is) is untouched since this only matters
+  // when the sidebar is being used as an overlay.
+  const selectTab = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+
   const displayName = user?.name || user?.username || user?.email?.split('@')[0] || 'Student';
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300 overflow-x-hidden">
+      {/* Mobile-only backdrop - clicking it closes the overlay sidebar.
+          Invisible/inert on desktop (md:hidden). */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className={`border-r border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between bg-white dark:bg-slate-950 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20 items-center px-3'}`}>
-        <div className={`space-y-8 w-full overflow-hidden ${!isSidebarOpen ? 'flex flex-col items-center' : ''}`}>
-          <div className={`flex items-center w-full ${isSidebarOpen ? 'gap-3' : 'justify-center'}`}>
+      <aside
+        className={`
+          fixed md:sticky top-0 left-0 h-screen z-30
+          border-r border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between
+          bg-white dark:bg-slate-950 transition-all duration-300
+          ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-64 md:w-20 -translate-x-full md:translate-x-0'}
+          ${!isSidebarOpen ? 'md:items-center md:px-3' : ''}
+        `}
+      >
+        <div className={`space-y-8 w-full overflow-hidden ${!isSidebarOpen ? 'md:flex md:flex-col md:items-center' : ''}`}>
+          <div className={`flex items-center w-full justify-between ${isSidebarOpen ? 'gap-3' : 'md:justify-center'}`}>
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors cursor-pointer shrink-0"
@@ -58,8 +94,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             >
               <Menu className="w-5 h-5" />
             </button>
+            {/* Close button - mobile overlay only */}
             {isSidebarOpen && (
-              <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors cursor-pointer shrink-0 md:hidden"
+                title="Close menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+            {isSidebarOpen && (
+              <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap absolute left-16 md:static">
                 <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/30 shrink-0">
                   <Brain className="w-5 h-5" />
                 </div>
@@ -68,12 +114,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             )}
           </div>
 
-          <nav className={`space-y-1.5 w-full overflow-hidden ${!isSidebarOpen ? 'flex flex-col items-center' : ''}`}>
+          <nav className={`space-y-1.5 w-full overflow-hidden ${!isSidebarOpen ? 'md:flex md:flex-col md:items-center' : ''}`}>
             <button
-              onClick={() => setActiveTab('home')}
+              onClick={() => selectTab('home')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'home' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
-              } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+              } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
               title="Overview"
             >
               <LayoutDashboard className="w-4 h-4 shrink-0" />
@@ -81,10 +127,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             </button>
 
             <button
-              onClick={() => setActiveTab('documents')}
+              onClick={() => selectTab('documents')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'documents' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
-              } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+              } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
               title="Documents Vault"
             >
               <FileText className="w-4 h-4 shrink-0" />
@@ -92,10 +138,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             </button>
 
             <button
-              onClick={() => setActiveTab('chat')}
+              onClick={() => selectTab('chat')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'chat' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
-              } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+              } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
               title="AI Tutor Chat"
             >
               <MessageSquare className="w-4 h-4 shrink-0" />
@@ -103,10 +149,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             </button>
 
             <button
-              onClick={() => setActiveTab('companion')}
+              onClick={() => selectTab('companion')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'companion' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
-                } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+                } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
                 title="AI Companion"
             >
               <Sparkles className="w-4 h-4 shrink-0" />
@@ -114,10 +160,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             </button>
 
             <button
-              onClick={() => setActiveTab('memory')}
+              onClick={() => selectTab('memory')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'memory' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
-              } ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+              } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
               title="Student Memory"
             >
               <Brain className="w-4 h-4 shrink-0" />
@@ -128,7 +174,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
         <button
           onClick={logout}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-rose-500 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${!isSidebarOpen ? 'justify-center px-0' : ''}`}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-rose-500 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
           title="Sign Out"
         >
           <LogOut className="w-4 h-4 shrink-0" />
@@ -137,33 +183,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-10 overflow-y-auto">
-        <div className="flex items-center justify-end gap-4 mb-6">
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle Theme"
-            className="relative flex items-center w-16 h-8 p-1 bg-slate-200 dark:bg-slate-900 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer border border-slate-300 dark:border-slate-800"
-          >
-            <div
-              className={`flex items-center justify-center w-6 h-6 bg-white dark:bg-slate-800 rounded-full shadow-md transform transition-transform duration-300 ${
-                isDarkMode ? 'translate-x-8 text-slate-200' : 'translate-x-0 text-amber-500'
-              }`}
+      <main className="flex-1 w-full min-w-0 p-4 sm:p-6 md:p-10 overflow-y-auto overflow-x-hidden">
+        <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 mb-6">
+          {/* Mobile menu button - only shown when the sidebar overlay is closed */}
+          {!isSidebarOpen && (
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors cursor-pointer md:hidden"
+              title="Open menu"
             >
-              {isDarkMode ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
-            </div>
-            <div className="absolute inset-0 flex justify-between items-center px-2 pointer-events-none text-slate-400 dark:text-slate-600">
-              <Sun className="w-3.5 h-3.5" />
-              <Moon className="w-3.5 h-3.5" />
-            </div>
-          </button>
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
 
-          <button
-            onClick={onOpenProfile}
-            className="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors cursor-pointer bg-slate-100 dark:bg-slate-900 px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800"
-            title="View Profile & Statistics"
-          >
-            Welcome, <span className="font-semibold text-slate-900 dark:text-slate-100">{displayName}</span>
-          </button>
+          <div className="flex items-center gap-4 ml-auto">
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle Theme"
+              className="relative flex items-center w-16 h-8 p-1 bg-slate-200 dark:bg-slate-900 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer border border-slate-300 dark:border-slate-800"
+            >
+              <div
+                className={`flex items-center justify-center w-6 h-6 bg-white dark:bg-slate-800 rounded-full shadow-md transform transition-transform duration-300 ${
+                  isDarkMode ? 'translate-x-8 text-slate-200' : 'translate-x-0 text-amber-500'
+                }`}
+              >
+                {isDarkMode ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+              </div>
+              <div className="absolute inset-0 flex justify-between items-center px-2 pointer-events-none text-slate-400 dark:text-slate-600">
+                <Sun className="w-3.5 h-3.5" />
+                <Moon className="w-3.5 h-3.5" />
+              </div>
+            </button>
+
+            <button
+              onClick={onOpenProfile}
+              className="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors cursor-pointer bg-slate-100 dark:bg-slate-900 px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 whitespace-nowrap"
+              title="View Profile & Statistics"
+            >
+              Welcome, <span className="font-semibold text-slate-900 dark:text-slate-100">{displayName}</span>
+            </button>
+          </div>
         </div>
 
         <div className="max-w-5xl mx-auto">
