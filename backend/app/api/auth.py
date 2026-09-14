@@ -210,7 +210,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _update_login_streak(current_user)
+    await db.commit()
+    await db.refresh(current_user)
     return current_user
 
 @router.put("/me", response_model=UserResponse)
