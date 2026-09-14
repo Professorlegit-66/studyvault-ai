@@ -136,6 +136,7 @@ studyvault-ai
 
 ## Known Limitations:
 
+- **Do not upload sensitive or confidential documents.** This is a student hackathon project, not a security-audited product. Uploaded content is processed by a third-party AI provider (Google Gemini) and stored in a shared-hosting database; it is not encrypted at rest, and (see below) the raw file itself isn't guaranteed to persist. Use sample notes, public course material, or other non-sensitive documents when testing or demoing.
 - **File storage is ephemeral in production.** The backend's free-tier hosting runs on an ephemeral filesystem, so uploaded files may not survive a redeploy or restart. Document content itself is safe (it's stored as extracted, embedded text in Postgres), but the original raw file — and the ability to re-download it — is not guaranteed to persist.
 - **Cold starts.** The free-tier backend sleeps after a period of inactivity; the first request afterward may take up to a minute.
 - **RAG uses in-process cosine similarity**, not a dedicated vector database — fine at this scale, but not built to scale to a large document corpus.
