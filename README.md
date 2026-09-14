@@ -1,4 +1,4 @@
-# StudyVault AI:
+# StudyVault AI
 
 An AI-powered study companion for students. Upload a document, get a grounded summary and Q&A, turn it into spaced-repetition flashcards, and keep a persistent-memory AI companion alongside it all.
 
