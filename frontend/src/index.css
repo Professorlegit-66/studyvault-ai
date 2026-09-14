@@ -3,12 +3,21 @@
 
 @layer base {
   html, body {
-    @apply bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300;
+    @apply bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+    /* Deliberately NOT using the transition-colors utility here (via
+       @apply) - it would crossfade text color at the same time as
+       background color. Tailwind's dark: classes flip text from
+       near-black to near-white and backgrounds from near-white to
+       near-black simultaneously; animating both linearly means at the
+       transition's midpoint they both land on roughly the same mid-gray
+       value, making text briefly vanish against its own background (the
+       theme-toggle "flicker"). Transitioning only background-color keeps
+       the smooth fade while text switches instantly, avoiding the dip. */
+    transition-property: background-color;
+    transition-duration: 300ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Tells the browser which native UI (scrollbars, form controls, etc.) to
-     use for each theme, so scrollbars aren't stuck light regardless of
-     the app's own dark mode toggle. */
   html {
     color-scheme: light;
   }
@@ -17,9 +26,18 @@
   }
 }
 
-/* Custom scrollbar styling (Chromium-based browsers: Chrome, Edge, Brave).
-   Matches the slate palette used throughout the app instead of relying
-   purely on color-scheme, which only gives a generic native look. */
+/* Same fix, app-wide: anywhere else in the codebase that uses Tailwind's
+   transition-colors / transition-all utility classes directly (e.g.
+   Dashboard.tsx's wrapper divs) gets color excluded from the animated
+   properties too, for the same reason as above. This is deliberately
+   NOT inside an @layer block - unlayered CSS always wins over @layer
+   content regardless of source order, so this reliably overrides
+   Tailwind's own utility-layer definitions of these two classes. */
+.transition-colors,
+.transition-all {
+  transition-property: background-color, border-color, box-shadow, transform, opacity;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -28,14 +46,14 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: rgb(148 163 184 / 0.5); /* slate-400 @ 50% */
+  background-color: rgb(148 163 184 / 0.5);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgb(148 163 184 / 0.8);
 }
 .dark ::-webkit-scrollbar-thumb {
-  background-color: rgb(71 85 105 / 0.6); /* slate-600 @ 60% */
+  background-color: rgb(71 85 105 / 0.6);
 }
 .dark ::-webkit-scrollbar-thumb:hover {
   background-color: rgb(71 85 105 / 0.9);
