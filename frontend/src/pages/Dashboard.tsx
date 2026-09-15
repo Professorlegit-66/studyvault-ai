@@ -78,7 +78,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
       {/* Sidebar Navigation */}
       <aside
         className={`
-          fixed md:sticky top-0 left-0 h-screen z-30
+          fixed md:sticky top-0 left-0 h-screen z-30 flex-shrink-0
           border-r border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between
           bg-white dark:bg-slate-950 transition-all duration-300
           ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-64 md:w-20 -translate-x-full md:translate-x-0'}
@@ -96,14 +96,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             </button>
 
             {isSidebarOpen && (
-              <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/30 shrink-0">
                   <Brain className="w-5 h-5" />
                 </div>
-                <span className="font-bold text-lg tracking-tight truncate min-w-0">StudyVault AI</span>
-                <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md shrink-0">
-                  Beta
-                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="font-bold text-lg tracking-tight truncate block">StudyVault AI</span>
+                  <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md leading-none">
+                    Beta
+                  </span>
+                </div>
               </div>
             )}
 
@@ -188,7 +190,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full min-w-0 h-full p-4 sm:p-6 md:p-10 overflow-y-auto overflow-x-hidden">
+      <main className="flex-1 w-full min-w-0 h-full p-4 sm:p-6 md:p-10 overflow-y-auto overflow-x-hidden transition-all duration-300">
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 mb-6">
           {/* Mobile menu button - only shown when the sidebar overlay is closed */}
           {!isSidebarOpen && (
@@ -230,7 +232,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto">
+        <div key={activeTab} className="max-w-5xl mx-auto animate-fade-slide-in">
           {activeTab === 'home' && (
             <HomeOverview
               userName={displayName}
