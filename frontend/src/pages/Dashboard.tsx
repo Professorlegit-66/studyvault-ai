@@ -65,7 +65,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
   const displayName = user?.name || user?.username || user?.email?.split('@')[0] || 'Student';
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300 overflow-x-hidden">
+    <div className="h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300 overflow-hidden">
       {/* Mobile-only backdrop - clicking it closes the overlay sidebar.
           Invisible/inert on desktop (md:hidden). */}
       {isSidebarOpen && (
@@ -188,7 +188,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full min-w-0 p-4 sm:p-6 md:p-10 overflow-y-auto overflow-x-hidden">
+      <main className="flex-1 w-full min-w-0 h-full p-4 sm:p-6 md:p-10 overflow-y-auto overflow-x-hidden">
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 mb-6">
           {/* Mobile menu button - only shown when the sidebar overlay is closed */}
           {!isSidebarOpen && (
