@@ -105,11 +105,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               </button>
             )}
             {isSidebarOpen && (
-              <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap absolute left-16 md:static">
+              <div className="flex items-center gap-2 overflow-hidden absolute left-16 md:static">
                 <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/30 shrink-0">
                   <Brain className="w-5 h-5" />
                 </div>
-                <span className="font-bold text-lg tracking-tight truncate">StudyVault AI</span>
+                <span className="font-bold text-lg tracking-tight truncate min-w-0 flex-1">StudyVault AI</span>
                 <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md shrink-0">
                   Beta
                 </span>
