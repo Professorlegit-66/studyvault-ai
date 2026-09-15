@@ -86,7 +86,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
         `}
       >
         <div className={`space-y-8 w-full overflow-hidden ${!isSidebarOpen ? 'md:flex md:flex-col md:items-center' : ''}`}>
-          <div className={`flex items-center w-full justify-between ${isSidebarOpen ? 'gap-3' : 'md:justify-center'}`}>
+          <div className={`flex items-center w-full gap-2 ${!isSidebarOpen ? 'md:justify-center' : ''}`}>
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors cursor-pointer shrink-0"
@@ -94,6 +94,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             >
               <Menu className="w-5 h-5" />
             </button>
+
+            {isSidebarOpen && (
+              <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
+                <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/30 shrink-0">
+                  <Brain className="w-5 h-5" />
+                </div>
+                <span className="font-bold text-lg tracking-tight truncate min-w-0">StudyVault AI</span>
+                <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md shrink-0">
+                  Beta
+                </span>
+              </div>
+            )}
+
             {/* Close button - mobile overlay only */}
             {isSidebarOpen && (
               <button
@@ -103,17 +116,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               >
                 <X className="w-5 h-5" />
               </button>
-            )}
-            {isSidebarOpen && (
-              <div className="flex items-center gap-2 overflow-hidden absolute left-16 md:static">
-                <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/30 shrink-0">
-                  <Brain className="w-5 h-5" />
-                </div>
-                <span className="font-bold text-lg tracking-tight truncate min-w-0 flex-1">StudyVault AI</span>
-                <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md shrink-0">
-                  Beta
-                </span>
-              </div>
             )}
           </div>
 
