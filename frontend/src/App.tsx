@@ -368,6 +368,10 @@ const AuthScreenContent: React.FC = () => {
             {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>
         </div>
+
+        <p className="mt-4 text-center text-xs text-slate-400 dark:text-slate-500">
+          StudyVault AI is under active development — some features may change or behave unexpectedly.
+        </p>
       </div>
     </div>
   );

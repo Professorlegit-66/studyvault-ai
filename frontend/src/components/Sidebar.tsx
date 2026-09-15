@@ -46,6 +46,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-bold text-base text-slate-900 dark:text-slate-100">
                 StudyVault AI
               </span>
+              <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md shrink-0">
+                Beta
+              </span>
             </div>
           )}
         </div>
