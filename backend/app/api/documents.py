@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from google import genai
 
 from app.database import get_db
@@ -96,6 +97,35 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported file format. Supported formats: .pdf, .docx, .txt, .md",
+        )
+
+    # Reject an exact-filename duplicate (same name AND extension) for this
+    # user before doing any work. Deliberately checks the FULL filename
+    # (including extension), not just the base name - "notes.pdf" and
+    # "notes.docx" are treated as two different documents, since a student
+    # may legitimately have both a PDF and their own Word transcript of the
+    # same material. Case-insensitive, since most people don't treat
+    # "Notes.pdf" and "notes.PDF" as meaningfully different files.
+    #
+    # This check matters more than it might look: it's what actually closes
+    # the false-upload-failure race (see the removed 45s timeout in
+    # DocumentManager.tsx) - if a client-side timeout fires while the
+    # upload is still completing server-side, and the user retries, THIS
+    # check (against the database, not the frontend's possibly-stale state)
+    # is what correctly blocks the accidental second upload.
+    existing = (
+        await db.execute(
+            select(Document).where(
+                Document.user_id == current_user.id,
+                func.lower(Document.title) == file.filename.lower(),
+            )
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A document named \"{file.filename}\" already exists. Rename the file, or delete the existing one first.",
         )
 
     # Safe, collision-proof storage name (never trust the original filename for the path)

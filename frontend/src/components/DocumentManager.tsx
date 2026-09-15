@@ -30,6 +30,7 @@ interface DocumentManagerProps {
 
 export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onDocumentsChange }) => {
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [generatingId, setGeneratingId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -43,19 +44,59 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    const file = files[0];
+
+    // Reset the input immediately - otherwise selecting the exact same
+    // file again later (e.g. right after resolving a duplicate-name
+    // conflict) won't fire onChange, since browsers don't re-trigger a
+    // change event for an unchanged file selection.
+    e.target.value = '';
+
+    setUploadError(null);
+    setSuccessMsg(null);
+
+    // Instant client-side check against documents already loaded this
+    // session - a courtesy for immediate feedback with no round trip. This
+    // is NOT the authoritative check; see the matching check in
+    // documents.py, which is what actually prevents a duplicate even when
+    // this local list is stale (e.g. mid-race with an in-flight upload of
+    // the same file that the frontend already gave up waiting on).
+    const isDuplicate = documents.some(
+      (doc) => doc.title.toLowerCase() === file.name.toLowerCase()
+    );
+    if (isDuplicate) {
+      setUploadError(`A document named "${file.name}" already exists. Rename the file, or delete the existing one first.`);
+      return;
+    }
 
     const formData = new FormData();
-    formData.append('file', files[0]);
+    formData.append('file', file);
 
     setUploading(true);
     try {
       await apiClient.post('/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        // Document upload can take far longer than a typical request -
+        // parsing plus one embedding API call per chunk, sequentially,
+        // possibly against a cold-starting backend. The global 45s
+        // timeout (set for quick requests like the initial session check)
+        // was too short here, and previously caused the frontend to
+        // report a false "failed" while the upload kept running and
+        // completed anyway server-side - which is what caused documents
+        // to appear to upload twice when a user retried after seeing that
+        // false failure. Disabling the timeout for this specific request
+        // (0 = no timeout in axios) fixes that at the source.
+        timeout: 0,
       });
       onDocumentsChange();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to upload document', err);
-      alert('Failed to upload document.');
+      const detail = err.response?.data?.detail;
+      setUploadError(
+        typeof detail === 'string'
+          ? detail
+          : 'Failed to upload document. Please try again.'
+      );
     } finally {
       setUploading(false);
     }
@@ -188,6 +229,13 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
         <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-xl flex items-center gap-3 text-emerald-500 dark:text-emerald-400 text-sm font-medium">
           <CheckCircle2 className="w-5 h-5 shrink-0" />
           <span>{successMsg}</span>
+        </div>
+      )}
+
+      {uploadError && (
+        <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-xl flex items-center gap-3 text-rose-500 dark:text-rose-400 text-sm font-medium">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <span>{uploadError}</span>
         </div>
       )}
 
