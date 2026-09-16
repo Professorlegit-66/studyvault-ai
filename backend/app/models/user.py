@@ -44,6 +44,11 @@ class User(Base):
     # while a change is in flight.
     pending_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    # --- "Don't show sensitive-data warning again" preference ---
+    # The post-login warning banner shows once per fresh login (not on
+    # page refresh) unless the user has permanently dismissed it here.
+    hide_security_warning: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     documents: Mapped[List["Document"]] = relationship("Document", back_populates="user", cascade="all, delete-orphan")
     conversations: Mapped[List["Conversation"]] = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
     flashcards: Mapped[List["Flashcard"]] = relationship("Flashcard", back_populates="user", cascade="all, delete-orphan")

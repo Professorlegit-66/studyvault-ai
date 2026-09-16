@@ -24,12 +24,16 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
+    hide_security_warning: Optional[bool] = None
 
 class UserResponse(BaseModel):
     id: int
     email: str
     name: str
     pending_email: Optional[str] = None
+    # Lets the frontend permanently suppress the post-login sensitive-data
+    # warning banner once the user has checked "Don't show this again".
+    hide_security_warning: bool = False
 
     class Config:
         from_attributes = True
@@ -230,6 +234,9 @@ async def update_user_profile(
 
     if payload.password:
         current_user.hashed_password = get_password_hash(payload.password)
+
+    if payload.hide_security_warning is not None:
+        current_user.hide_security_warning = payload.hide_security_warning
 
     if payload.email and payload.email != current_user.email:
         stmt = select(User).where(User.email == payload.email)

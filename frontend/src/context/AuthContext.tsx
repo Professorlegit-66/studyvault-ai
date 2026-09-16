@@ -5,6 +5,8 @@ interface User {
   id: number;
   email: string;
   name: string;
+  pending_email?: string | null;
+  hide_security_warning?: boolean;
 }
 
 interface RegisterResult {
@@ -17,6 +19,13 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isSlowConnection: boolean;
+  // True only for the login that just happened in this browser tab -
+  // set inside login(), never during the silent token-restoration effect
+  // below that runs on every page load/refresh. This is what lets the
+  // sensitive-data warning banner show once per fresh login without
+  // reappearing on every refresh of an already-open session.
+  justLoggedIn: boolean;
+  acknowledgeJustLoggedIn: () => void;
   login: (token: string, userData: User) => void;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
@@ -29,6 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [justLoggedIn, setJustLoggedIn] = useState<boolean>(false);
 
   // Flips true if the initial session check is taking a while - lets the UI
   // show "waking up the server..." instead of a bare, unexplained spinner
@@ -89,16 +99,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('access_token', newToken);
     setToken(newToken);
     setUser(userData);
+    setJustLoggedIn(true);
   };
 
   const logout = () => {
     localStorage.removeItem('access_token');
     setToken(null);
     setUser(null);
+    setJustLoggedIn(false);
   };
 
   const updateUser = (userData: Partial<User>) => {
     setUser((prev) => (prev ? { ...prev, ...userData } : null));
+  };
+
+  // The warning banner calls this once it's done showing (timer elapsed,
+  // manually closed, or "don't show again" saved) so it doesn't try to
+  // show again for the rest of this session even though justLoggedIn
+  // was briefly true.
+  const acknowledgeJustLoggedIn = () => {
+    setJustLoggedIn(false);
   };
 
   const register = async (name: string, email: string, password: string): Promise<RegisterResult> => {
@@ -107,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, isSlowConnection, login, logout, updateUser, register }}>
+    <AuthContext.Provider value={{ user, token, isLoading, isSlowConnection, justLoggedIn, acknowledgeJustLoggedIn, login, logout, updateUser, register }}>
       {children}
     </AuthContext.Provider>
   );

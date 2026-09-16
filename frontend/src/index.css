@@ -24,6 +24,11 @@
   html.dark {
     color-scheme: dark;
   }
+
+  /* Hide the text cursor (caret) on general UI text while keeping text copyable */
+  p, span, h1, h2, h3, h4, h5, h6, label {
+    caret-color: transparent;
+  }
 }
 
 /* Same fix, app-wide: anywhere else in the codebase that uses Tailwind's

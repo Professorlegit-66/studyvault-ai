@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import HelpAssistant from '../components/HelpAssistant';
 import { AICompanion } from '../components/AICompanion';
+import { SecurityWarningBanner } from '../components/SecurityWarningBanner';
 
 interface DashboardProps {
   onOpenProfile?: () => void;
@@ -66,6 +67,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
   return (
     <div className="h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300 overflow-hidden">
+      <SecurityWarningBanner />
+
       {/* Mobile-only backdrop - clicking it closes the overlay sidebar.
           Invisible/inert on desktop (md:hidden). */}
       {isSidebarOpen && (

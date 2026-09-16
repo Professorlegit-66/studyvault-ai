@@ -4,6 +4,7 @@ import { FileText, Upload, Sparkles, Trash2, CheckSquare, Square, Loader2, Alert
 import { PdfViewer } from './PdfViewer';
 import { TextViewer } from './TextViewer';
 import { CustomSelect } from './CustomSelect';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export interface Document {
   id: number;
@@ -258,30 +259,16 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
         </div>
       )}
 
-      {showConfirm && (
-        <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-xl flex items-center justify-between">
-          <div className="flex items-center gap-3 text-rose-500 dark:text-rose-400 text-sm font-medium">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>Are you sure you want to delete {selectedIds.length} selected document(s)? This cannot be undone.</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowConfirm(false)}
-              className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDeleteSelected}
-              disabled={deleting}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50"
-            >
-              {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>Yes, Delete</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showConfirm}
+        title="Delete documents?"
+        message={`Are you sure you want to delete ${selectedIds.length} selected document(s)? This cannot be undone.`}
+        confirmLabel="Yes, Delete"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={handleDeleteSelected}
+        onCancel={() => setShowConfirm(false)}
+      />
 
       {documents.length === 0 ? (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center space-y-4 shadow-xl">
