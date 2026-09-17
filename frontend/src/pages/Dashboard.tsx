@@ -6,9 +6,9 @@ import type { Document } from '../components/DocumentManager';
 import { StudentMemory } from '../components/StudentMemory';
 import { AITutorChat } from '../components/AITutorChat';
 import type { Message } from '../components/AITutorChat';
-import { LayoutDashboard, FileText, Brain, MessageSquare, Sun, Moon, LogOut, Menu, Sparkles, X } from 'lucide-react';
+import { LayoutDashboard, FileText, Brain, MessageSquare, LogOut, Menu, Sparkles, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+import { ThemeToggle } from '../components/ThemeToggle';
 import HelpAssistant from '../components/HelpAssistant';
 import { AICompanion } from '../components/AICompanion';
 import { SecurityWarningBanner } from '../components/SecurityWarningBanner';
@@ -19,7 +19,6 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
   const { user, logout } = useAuth() as { user: { name?: string; username?: string; email?: string } | null; logout: () => void };
-  const { isDarkMode, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'home' | 'documents' | 'memory' | 'chat' | 'companion'>('home');
   const [documents, setDocuments] = useState<Document[]>([]);
 
@@ -207,23 +206,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           )}
 
           <div className="flex items-center gap-4 ml-auto">
-            <button
-              onClick={toggleTheme}
-              aria-label="Toggle Theme"
-              className="relative flex items-center w-16 h-8 p-1 bg-slate-200 dark:bg-slate-900 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer border border-slate-300 dark:border-slate-800"
-            >
-              <div
-                className={`flex items-center justify-center w-6 h-6 bg-white dark:bg-slate-800 rounded-full shadow-md transform transition-transform duration-300 ${
-                  isDarkMode ? 'translate-x-8 text-slate-200' : 'translate-x-0 text-amber-500'
-                }`}
-              >
-                {isDarkMode ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
-              </div>
-              <div className="absolute inset-0 flex justify-between items-center px-2 pointer-events-none text-slate-400 dark:text-slate-600">
-                <Sun className="w-3.5 h-3.5" />
-                <Moon className="w-3.5 h-3.5" />
-              </div>
-            </button>
+            <ThemeToggle />
 
             <button
               onClick={onOpenProfile}

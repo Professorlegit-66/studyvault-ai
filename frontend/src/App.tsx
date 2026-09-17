@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { UserProfileModal } from './components/UserProfileModal';
 import { apiClient } from './api/client';
-import { BookOpen, KeyRound, Mail, User, Loader2, AlertCircle, Sun, Moon, ShieldCheck, RotateCw } from 'lucide-react';
+import { BookOpen, KeyRound, Mail, User, Loader2, AlertCircle, ShieldCheck, RotateCw } from 'lucide-react';
+import { ThemeToggle } from './components/ThemeToggle';
 
 const AuthScreenContent: React.FC = () => {
   const { login } = useAuth();
-  const { isDarkMode, toggleTheme } = useTheme();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,10 +46,6 @@ const AuthScreenContent: React.FC = () => {
         await apiClient.post('/auth/resend-verification', { email: targetEmail });
         setSuccess('Looks like your last registration didn\u2019t finish. We\u2019ve sent a fresh code to your email.');
       } catch (err: any) {
-        // If resend itself fails (e.g. genuinely already verified, which
-        // login already ruled out, or a transient error), fall back to
-        // just showing the verify screen with its own manual "Resend" button
-        // rather than blocking the user from getting there at all.
         const detail = err.response?.data?.detail;
         setError(typeof detail === 'string' ? detail : 'Could not automatically resend a code - use the resend button below.');
       } finally {
@@ -88,34 +84,18 @@ const AuthScreenContent: React.FC = () => {
           full_name: name,
         });
 
-        // Move to the verification step instead of bouncing back to login -
-        // the account exists but can't be used until the OTP is confirmed.
         await enterVerifyStep(res.data.email, { autoResend: false });
         setPassword('');
       }
     } catch (err: any) {
       console.error("Auth error details:", err.response);
 
-      // A 403 from /auth/login is only ever "please verify your email
-      // before logging in" (see api/auth.py) - meaning an account exists
-      // for this email but was never verified. This is the recovery path
-      // for a registration that was interrupted (e.g. a network drop)
-      // before the user ever saw the OTP screen: instead of leaving them
-      // stuck on an error with no way back to entering a code, route them
-      // straight into the verify screen and fire off a fresh code for them.
       if (isLogin && err.response?.status === 403) {
         await enterVerifyStep(email, { autoResend: true });
         setLoading(false);
         return;
       }
 
-      // Similarly, registering again with an email that already exists is
-      // the other symptom of the same interrupted-registration scenario
-      // (see the chat/handoff notes) - if the account is genuinely
-      // unverified, sending them to the verify screen is more useful than
-      // a dead-end "email already exists" error. If it's a truly different,
-      // already-verified account, verify-email/resend will fail cleanly
-      // and the existing error UI on that screen still explains why.
       if (!isLogin && err.response?.status === 400 &&
           typeof err.response?.data?.detail === 'string' &&
           err.response.data.detail.toLowerCase().includes('already exists')) {
@@ -182,32 +162,12 @@ const AuthScreenContent: React.FC = () => {
     }
   };
 
-  const ThemeToggle = (
-    <div className="absolute top-6 right-6">
-      <button
-        onClick={toggleTheme}
-        aria-label="Toggle Theme"
-        className="relative flex items-center w-16 h-8 p-1 bg-slate-200 dark:bg-slate-900 rounded-full transition-colors duration-300 focus:outline-none cursor-pointer border border-slate-300 dark:border-slate-800 shadow-sm"
-      >
-        <div
-          className={`flex items-center justify-center w-6 h-6 bg-white dark:bg-slate-800 rounded-full shadow-md transform transition-transform duration-300 ${
-            isDarkMode ? 'translate-x-8 text-slate-200' : 'translate-x-0 text-amber-500'
-          }`}
-        >
-          {isDarkMode ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
-        </div>
-        <div className="absolute inset-0 flex justify-between items-center px-2 pointer-events-none text-slate-400 dark:text-slate-600">
-          <Sun className="w-3.5 h-3.5" />
-          <Moon className="w-3.5 h-3.5" />
-        </div>
-      </button>
-    </div>
-  );
-
   if (authStep === 'verify') {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 relative transition-colors duration-300">
-        {ThemeToggle}
+        <div className="absolute top-6 right-6">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300">
           <div className="flex flex-col items-center mb-6">
             <div className="p-2.5 bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 rounded-xl mb-3">
@@ -280,7 +240,9 @@ const AuthScreenContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 relative transition-colors duration-300">
-      {ThemeToggle}
+      <div className="absolute top-6 right-6">
+        <ThemeToggle />
+      </div>
 
       <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300">
         <div className="flex items-center justify-center gap-3 mb-6">
