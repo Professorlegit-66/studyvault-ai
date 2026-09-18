@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { apiClient } from '../api/client';
 import { Sparkles, Plus, Trash2, Send, Brain, X, MessageCircle } from 'lucide-react';
 
@@ -123,7 +124,6 @@ export const AICompanion: React.FC = () => {
 
     let conversationId = activeConversationId;
 
-    // No active thread yet - create one transparently before sending
     if (!conversationId) {
       try {
         const res = await apiClient.post<Conversation>('/companion/conversations');
@@ -166,7 +166,6 @@ export const AICompanion: React.FC = () => {
         setTimeout(() => setJustRemembered(null), 4000);
       }
 
-      // First message in a thread changes its title server-side - resync the list
       fetchConversations();
     } catch (err) {
       console.error('Failed to send message', err);
@@ -191,7 +190,6 @@ export const AICompanion: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-140px)]">
-      {/* Conversation list sidebar */}
       <div className="w-full md:w-64 md:shrink-0 max-h-56 md:max-h-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 space-y-2">
           <button
@@ -244,7 +242,6 @@ export const AICompanion: React.FC = () => {
         </div>
       </div>
 
-      {/* Chat window */}
       <div className="flex-1 min-h-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -287,7 +284,32 @@ export const AICompanion: React.FC = () => {
                       : 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'
                   }`}
                 >
-                  {msg.content}
+                  {msg.sender === 'user' ? (
+                    <span className="whitespace-pre-wrap">{msg.content}</span>
+                  ) : (
+                    <div className="space-y-3">
+                      <ReactMarkdown
+                        components={{
+                          h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+                          h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                          h3: ({ node, ...props }) => <h3 className="text-md font-bold mt-2 mb-1 text-indigo-600 dark:text-indigo-400" {...props} />,
+                          p: ({ node, ...props }) => <p className="leading-relaxed mb-2" {...props} />,
+                          ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-1 mb-2" {...props} />,
+                          ol: ({ node, ...props }) => <ol className="list-decimal pl-5 space-y-1 mb-2" {...props} />,
+                          li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                          strong: ({ node, ...props }) => <strong className="font-bold text-slate-900 dark:text-slate-100" {...props} />,
+                          code: ({ node, inline, ...props }: any) =>
+                            inline ? (
+                              <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[13px] text-pink-600 dark:text-pink-400" {...props} />
+                            ) : (
+                              <code className="block bg-slate-800 text-slate-50 p-3 rounded-lg text-[13px] overflow-x-auto my-2" {...props} />
+                            ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -322,7 +344,6 @@ export const AICompanion: React.FC = () => {
         </div>
       </div>
 
-      {/* Memory management panel */}
       {showMemoryPanel && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">

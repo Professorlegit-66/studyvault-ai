@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 from google import genai
-from google.genai import types
+from google.genai import types, errors
 
 from app.database import get_db
 from app.api.auth import get_current_user
@@ -90,11 +90,12 @@ async def chat_with_docs(
 
         context = "\n\n---\n\n".join([item[1] for item in top_chunks])
 
-        prompt = f"""You are StudyVault AI, a helpful AI tutor.
+        prompt = f"""You are StudyVault AI, a helpful and direct AI tutor.
 
 Guidelines:
-1. If the user asks general, conversational, or meta questions (such as "Can you access my files?", "How do you work?", "Hello"), answer politely and confirm access to their vault.
-2. For specific academic or subject questions, answer strictly and accurately using the provided context below. Cite relevant details from the context.
+1. For academic or subject-specific questions, DO NOT use greetings (e.g., "Hello") or state that you have accessed the vault. Start your response directly with the answer, or use a natural lead-in like "Based on the provided context..."
+2. Only confirm access to the vault if the user explicitly asks a meta-question like "Can you see my files?" or "Are you connected?"
+3. Answer strictly and accurately using the provided context below. Cite relevant details from the context.
 
 Context from Vault:
 {context}
@@ -113,29 +114,32 @@ User Question: {request.query}
 
         return ChatResponse(answer=gen_res.text, sources=sources)
 
-    except Exception as e:
-        error_str = str(e)
-
-        # Same pattern as companion.py (bug #13): Gemini's free-tier quota
-        # (~20 requests/window) gets hit during normal dev/testing and raises
-        # a 429 RESOURCE_EXHAUSTED ClientError. Left uncaught, this fell
-        # through to the generic 500 handler below, which the frontend then
-        # showed as a misleading "check your connection or uploaded files"
-        # message - actively wrong advice for a quota issue. Instead, return
-        # a normal 200 with an honest in-character message, same as
-        # companion.py does, so it just appears as a graceful chat reply
-        # rather than a crash.
-        if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
-            print(f"[RAG Chat] Gemini rate limit hit: {error_str}")
+    except errors.APIError as e:
+        # Handle specific Google GenAI API errors
+        if e.code == 503:
+            raise HTTPException(
+                status_code=503, 
+                detail="The AI provider is currently experiencing high demand. Please try again in a few moments."
+            )
+        elif e.code == 429:
+            # Same pattern as companion.py: return a normal 200 with an honest 
+            # in-character message for free-tier quotas, rather than crashing the UI.
+            print(f"[RAG Chat] Gemini rate limit hit: {e.message}")
             return ChatResponse(
                 answer="I've hit my usage limit for the moment and can't respond right now. Please try again in a little while.",
                 sources=[]
             )
+        else:
+            raise HTTPException(
+                status_code=502, 
+                detail=f"AI Provider Error: {e.message}"
+            )
 
+    except Exception as e:
         print("\n=== RAG CHAT ERROR TRACEBACK ===")
         traceback.print_exc()
         print("================================\n")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"RAG Error: {str(e)}"
+            detail="An unexpected internal server error occurred."
         )
