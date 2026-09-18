@@ -98,13 +98,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             </button>
 
             {isSidebarOpen && (
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/30 shrink-0">
-                  <Brain className="w-5 h-5" />
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {/* Logo Container: Acts as a square window to crop the wide image */}
+                <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center">
+                  <img 
+                    src="/Full Logo.png" 
+                    alt="StudyVault AI Logo" 
+                    /* object-left pins the view to the first logo, scale-125 zooms past the whitespace borders */
+                    className="w-full h-full object-cover object-left scale-125 origin-left" 
+                  />
                 </div>
+                
+                {/* Typography and Tagging */}
                 <div className="min-w-0 flex-1">
-                  <span className="font-bold text-lg tracking-tight truncate block">StudyVault AI</span>
-                  <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md leading-none">
+                  <span className="font-bold text-[16px] tracking-tight truncate block text-slate-900 dark:text-slate-50">
+                    StudyVault AI
+                  </span>
+                  <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md leading-none">
                     Beta
                   </span>
                 </div>

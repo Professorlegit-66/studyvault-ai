@@ -40,7 +40,7 @@
    Tailwind's own utility-layer definitions of these two classes. */
 .transition-colors,
 .transition-all {
-  transition-property: background-color, border-color, box-shadow, transform, opacity;
+  transition-property: background-color, border-color, box-shadow, transform, opacity, width, height;
 }
 
 ::-webkit-scrollbar {
