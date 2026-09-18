@@ -206,6 +206,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           )}
 
           <div className="flex items-center gap-4 ml-auto">
+            <HelpAssistant />
             <ThemeToggle />
 
             <button
@@ -240,8 +241,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           {activeTab === 'memory' && <StudentMemory />}
         </div>
       </main>
-
-      <HelpAssistant />
     </div>
   );
 };

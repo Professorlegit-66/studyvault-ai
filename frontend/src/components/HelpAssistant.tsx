@@ -1,19 +1,17 @@
 // File: frontend/src/components/HelpAssistant.tsx
-// NEW FILE — does not replace anything existing.
-// Mount this once inside Dashboard.tsx, e.g. right before the closing tag
-// of the top-level shell div, so it floats above every tab:
 //
-//   import HelpAssistant from '../components/HelpAssistant';
-//   ...
-//   <HelpAssistant />
-//
-// State is kept LOCAL to this component (not lifted to Dashboard.tsx),
-// unlike AITutorChat's messages. That's intentional for Pass 1 — this
-// widget doesn't need to persist across tab switches as urgently, and
-// keeping its state local avoids repeating the file/state mix-up pattern
-// this project has hit before.
+// Docked in the header (next to the theme toggle / Welcome badge) rather
+// than floating over the page - see Dashboard.tsx, where it's now rendered
+// inside the header row instead of at the very end of the component. This
+// replaces the earlier fixed-bottom-right floating bubble, which had no
+// robust way to avoid overlapping page content (it always sat over
+// whatever happened to be in that corner - see the various layout-overlap
+// bugs this caused). Anchoring it to a header icon means there's
+// structurally nothing for it to cover: it opens relative to a UI element
+// that's always present and always in the same place.
 
 import { useState, useRef, useEffect } from 'react';
+import { MessageCircle, X } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 interface HelpMessage {
@@ -22,15 +20,12 @@ interface HelpMessage {
   text: string;
 }
 
-// Safety net: the backend prompt asks Gemini not to use markdown, but
-// occasionally it slips in **bold** or bullet asterisks anyway. Strip the
-// common cases so the chat bubble never shows raw asterisks/hashes to the user.
 function stripMarkdown(text: string): string {
   return text
-    .replace(/\*\*(.*?)\*\*/g, '$1') // **bold**
-    .replace(/\*(.*?)\*/g, '$1') // *italic*
-    .replace(/^#{1,6}\s+/gm, '') // # headers
-    .replace(/^[-*]\s+/gm, '• '); // bullet markers -> plain bullet
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^[-*]\s+/gm, '• ');
 }
 
 export default function HelpAssistant() {
@@ -45,10 +40,33 @@ export default function HelpAssistant() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
+
+  // Click-outside and Escape both close the panel - standard dropdown
+  // behavior, since this is no longer a persistent floating window.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen]);
 
   const handleSend = async () => {
     const trimmed = input.trim();
@@ -64,8 +82,6 @@ export default function HelpAssistant() {
     setIsLoading(true);
 
     try {
-      // apiClient's baseURL already includes /api, so this hits
-      // POST /api/assistant/query
       const response = await apiClient.post('/assistant/query', {
         message: trimmed,
       });
@@ -95,17 +111,36 @@ export default function HelpAssistant() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div ref={containerRef} className="relative">
+      <button
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label={isOpen ? 'Close help assistant' : 'Open help assistant'}
+        aria-expanded={isOpen}
+        className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors cursor-pointer"
+        title="Help"
+      >
+        {isOpen ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+      </button>
+
       {isOpen && (
-        <div className="mb-3 w-80 max-w-[calc(100vw-3rem)] h-96 max-h-[70vh] flex flex-col rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-indigo-600 text-white">
+        <div
+          className="
+            fixed inset-x-4 bottom-20 md:bottom-auto
+            md:absolute md:inset-x-auto md:top-full md:right-0 md:mt-2
+            w-auto md:w-96 max-w-[calc(100vw-2rem)]
+            h-[28rem] max-h-[70vh]
+            flex flex-col rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700
+            bg-white dark:bg-gray-800 overflow-hidden z-50
+          "
+        >
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-indigo-600 text-white shrink-0">
             <span className="font-medium text-sm">Help Assistant</span>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-white/80 hover:text-white text-sm"
+              className="text-white/80 hover:text-white"
               aria-label="Close help assistant"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           </div>
 
@@ -136,33 +171,25 @@ export default function HelpAssistant() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+          <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 shrink-0">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask how to do something..."
-              className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 min-w-0 rounded-md border border-gray-300 dark:border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
               onClick={handleSend}
               disabled={isLoading || !input.trim()}
-              className="rounded-md bg-indigo-600 text-white px-3 py-2 text-sm disabled:opacity-50"
+              className="shrink-0 rounded-md bg-indigo-600 text-white px-3 py-2 text-sm disabled:opacity-50"
             >
               Send
             </button>
           </div>
         </div>
       )}
-
-      <button
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg flex items-center justify-center text-2xl hover:bg-indigo-700 transition"
-        aria-label="Toggle help assistant"
-      >
-        {isOpen ? '✕' : '💬'}
-      </button>
     </div>
   );
 }
