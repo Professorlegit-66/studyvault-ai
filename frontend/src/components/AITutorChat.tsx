@@ -1,9 +1,9 @@
+// src/components/AITutorChat.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { apiClient } from '../api/client';
 import type { Document } from './DocumentManager';
-import { Send, Bot, User, Loader2, Sparkles, BookOpen, Filter } from 'lucide-react';
-import { CustomSelect } from './CustomSelect';
+import { Send, Bot, User, Loader2, Sparkles, BookOpen, Filter, Check, ChevronDown, Layers, FileText } from 'lucide-react';
 
 export interface Message {
   sender: 'user' | 'ai';
@@ -23,9 +23,12 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
   setMessages,
 }) => {
   const [input, setInput] = useState('');
-  const [selectedDocId, setSelectedDocId] = useState<string>('all');
+  const [ragMode, setRagMode] = useState<'single' | 'multi'>('single');
+  const [selectedIds, setSelectedIds] = useState<string[]>(['all']);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,6 +37,62 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleModeSwitch = (mode: 'single' | 'multi') => {
+    setRagMode(mode);
+    if (mode === 'single') {
+      // If switching to single mode, keep only the first selected doc, or default to 'all'
+      if (selectedIds.length > 1 && !selectedIds.includes('all')) {
+        setSelectedIds([selectedIds[0]]);
+      }
+    }
+  };
+
+  const handleToggleDoc = (id: string) => {
+    if (ragMode === 'single') {
+      // In single mode, clicking any document replaces selection and closes dropdown
+      setSelectedIds([id]);
+      setIsDropdownOpen(false);
+      return;
+    }
+
+    // Multi mode logic
+    if (id === 'all') {
+      setSelectedIds(['all']);
+      return;
+    }
+
+    setSelectedIds((prev) => {
+      const withoutAll = prev.filter((item) => item !== 'all');
+      if (withoutAll.includes(id)) {
+        const next = withoutAll.filter((item) => item !== id);
+        return next.length === 0 ? ['all'] : next;
+      } else {
+        return [...withoutAll, id];
+      }
+    });
+  };
+
+  const getDropdownLabel = () => {
+    if (selectedIds.includes('all') || selectedIds.length === 0) {
+      return ragMode === 'single' ? 'Select Document...' : 'All Vault Documents';
+    }
+    if (selectedIds.length === 1) {
+      const doc = documents.find((d) => String(d.id) === selectedIds[0]);
+      return doc ? doc.title : '1 Document Selected';
+    }
+    return `${selectedIds.length} Documents Selected`;
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,9 +104,18 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     setLoading(true);
 
     try {
-      const payload: { query: string; document_id?: number } = { query: userQuery };
-      if (selectedDocId !== 'all') {
-        payload.document_id = Number(selectedDocId);
+      const payload: { query: string; document_id?: number; document_ids?: number[] } = { query: userQuery };
+      
+      if (ragMode === 'single') {
+        if (selectedIds.length > 0 && selectedIds[0] !== 'all') {
+          payload.document_id = Number(selectedIds[0]);
+        }
+      } else {
+        // Filter out 'all' and convert to numbers properly
+        const activeIds = selectedIds.filter((id) => id !== 'all').map((id) => Number(id));
+        if (activeIds.length > 0) {
+          payload.document_ids = activeIds;
+        }
       }
 
       const response = await apiClient.post('/rag/chat', payload);
@@ -60,10 +128,10 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
         },
       ]);
     } catch (err: any) {
-      // Extract FastAPI custom error detail, or fallback to the Axios network/timeout error message
-      const errorMessage = err.response?.data?.detail 
-        || err.message 
-        || 'Failed to retrieve an answer. Please verify your connection or uploaded files.';
+      const errorMessage =
+        err.response?.data?.detail ||
+        err.message ||
+        'Failed to retrieve an answer. Please verify your connection or uploaded files.';
 
       setMessages((prev) => [
         ...prev,
@@ -92,24 +160,101 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
           </div>
         </div>
 
-        <CustomSelect
-          className="w-full sm:w-56"
-          value={selectedDocId}
-          onChange={(v) => setSelectedDocId(v)}
-          icon={<Filter className="w-3.5 h-3.5" />}
-          options={[
-            { value: 'all', label: 'All Vault Documents' },
-            ...documents.map((doc) => ({ value: String(doc.id), label: doc.title })),
-          ]}
-        />
+        {/* Controls: Mode Switcher + Scoping Dropdown */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Mode Toggle Pill */}
+          <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleModeSwitch('single')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                ragMode === 'single'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+              title="Single Document Mode"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Single</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeSwitch('multi')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                ragMode === 'multi'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+              title="Multi-Document Mode"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Multi</span>
+            </button>
+          </div>
+
+          {/* Scoping Dropdown */}
+          <div className="relative flex-1 sm:w-60" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="w-full flex items-center justify-between gap-2 px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-indigo-500 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="truncate">{getDropdownLabel()}</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto p-1.5 space-y-1">
+                {ragMode === 'multi' && (
+                  <>
+                    <div
+                      onClick={() => handleToggleDoc('all')}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                        selectedIds.includes('all')
+                          ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>All Vault Documents</span>
+                      {selectedIds.includes('all') && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
+                    </div>
+                    <div className="border-t border-slate-200 dark:border-slate-800 my-1" />
+                  </>
+                )}
+
+                {documents.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-slate-400 text-center">No documents uploaded</div>
+                ) : (
+                  documents.map((doc) => {
+                    const isSelected = selectedIds.includes(String(doc.id));
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => handleToggleDoc(String(doc.id))}
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400'
+                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{doc.title}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4 scrollbar-thin">
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+          <div key={idx} className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.sender === 'ai' && (
               <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit">
                 <Bot className="w-4 h-4" />
