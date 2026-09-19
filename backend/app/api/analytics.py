@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -18,14 +18,10 @@ async def get_analytics_summary(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        # 1. Fetch user flashcards
-        cards_stmt = select(Flashcard).where(Flashcard.user_id == current_user.id)
-        cards = (await db.execute(cards_stmt)).scalars().all()
-
         date_counts = {}
         total_review_logs = 0
 
-        # 2. Query ReviewLog table cleanly
+        # 1. Query ReviewLog table cleanly FIRST (protects cards from rollbacks)
         try:
             logs_stmt = select(ReviewLog).where(ReviewLog.user_id == current_user.id)
             logs = (await db.execute(logs_stmt)).scalars().all()
@@ -40,8 +36,12 @@ async def get_analytics_summary(
                     date_str = dt.strftime("%Y-%m-%d")
                     date_counts[date_str] = date_counts.get(date_str, 0) + 1
         except Exception as log_err:
-            print(f"[Analytics] ReviewLog query error: {log_err}")
+            print(f"[Analytics] DB ERROR - ReviewLog schema mismatch: {log_err}")
             await db.rollback()
+
+        # 2. Fetch user flashcards AFTER any potential log rollbacks have safely concluded
+        cards_stmt = select(Flashcard).where(Flashcard.user_id == current_user.id)
+        cards = (await db.execute(cards_stmt)).scalars().all()
 
         # 3. Fallback count from Flashcard last_reviewed_at if logs table was empty
         if total_review_logs == 0:
@@ -68,13 +68,13 @@ async def get_analytics_summary(
             # Active Recall Mastery Ratio
             mastered_cards = sum(
                 1 for c in cards 
-                if (getattr(c, "interval_days", 1) or 1) >= 3 or (getattr(c, "repetition_number", 0) or 0) >= 2
+                if ((getattr(c, "interval_days", 0) or 0) >= 3) or ((getattr(c, "repetition_number", 0) or 0) >= 2)
             )
             mastery_ratio = (mastered_cards / total_cards) * 100
 
             # Real Retention Formula: 60% Ease Factor + 40% Recall Mastery Ratio
             calculated_retention = round((0.6 * ease_score) + (0.4 * mastery_ratio))
-            retention_score = min(100, max(15, calculated_retention))
+            retention_score = min(100, max(0, calculated_retention))
         else:
             retention_score = 0
 
@@ -91,6 +91,8 @@ async def get_analytics_summary(
             "heatmap": heatmap,
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Analytics summary error: {e}")
         return {
             "retention_score": 0,
