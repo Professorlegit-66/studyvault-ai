@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { Brain, Download, CheckCircle, RotateCw, RefreshCw, Search, Filter, FileX } from 'lucide-react';
+import { Brain, Download, CheckCircle, RotateCw, RefreshCw, Search, Filter, FileX, Trash2, AlertTriangle, X } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
 
 interface Flashcard {
@@ -20,6 +20,7 @@ export const StudentMemory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('all');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const fetchCards = async () => {
     setLoading(true);
@@ -54,6 +55,31 @@ export const StudentMemory: React.FC = () => {
     }
   };
 
+  const handleDeleteCard = async (cardId: number) => {
+    try {
+      await apiClient.delete(`/memory/cards/${cardId}`);
+      setIsFlipped(false);
+      const updated = flashcards.filter(c => c.id !== cardId);
+      setFlashcards(updated);
+      if (currentIndex >= updated.length && currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+      }
+    } catch (err) {
+      console.error('Failed to delete flashcard', err);
+    }
+  };
+
+  const handleClearOrphaned = async () => {
+    try {
+      await apiClient.delete('/memory/orphaned');
+      setShowClearConfirm(false);
+      fetchCards();
+      setCurrentIndex(0);
+    } catch (err) {
+      console.error('Failed to clear orphaned flashcards', err);
+    }
+  };
+
   const exportFlashcardsJSON = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredCards, null, 2));
     const downloadAnchor = document.createElement('a');
@@ -64,8 +90,6 @@ export const StudentMemory: React.FC = () => {
     downloadAnchor.remove();
   };
 
-  // Map topics to their removed status.
-  // A topic is marked as removed ONLY if all its flashcards have a null document_id.
   const topicStatusMap = new Map<string, boolean>();
   flashcards.forEach(card => {
     if (card.topic) {
@@ -73,7 +97,6 @@ export const StudentMemory: React.FC = () => {
       if (!topicStatusMap.has(card.topic)) {
         topicStatusMap.set(card.topic, isNull);
       } else if (!isNull) {
-        // If we find at least one card with a valid document_id, it is not fully removed.
         topicStatusMap.set(card.topic, false);
       }
     }
@@ -92,6 +115,8 @@ export const StudentMemory: React.FC = () => {
     return matchesSearch && matchesTopic;
   });
 
+  const hasOrphanedCards = flashcards.some(c => c.document_id == null);
+
   if (loading) {
     return <div className="text-center py-10 text-slate-400">Loading your memory queue...</div>;
   }
@@ -106,6 +131,16 @@ export const StudentMemory: React.FC = () => {
           <p className="text-sm text-slate-500 dark:text-slate-400">Review your cards to strengthen active recall retention.</p>
         </div>
         <div className="flex items-center gap-3">
+          {hasOrphanedCards && (
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl text-sm font-medium transition-colors cursor-pointer"
+              title="Delete all flashcards with missing source documents"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Clear Removed Cards</span>
+            </button>
+          )}
           <button
             onClick={() => fetchCards()}
             className="flex items-center gap-2 px-3 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors cursor-pointer"
@@ -171,7 +206,17 @@ export const StudentMemory: React.FC = () => {
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 shadow-xl max-w-2xl mx-auto space-y-6">
           <div className="flex justify-between items-center text-xs font-medium text-slate-400 uppercase tracking-wider">
-            <span>Card {currentIndex + 1} of {filteredCards.length}</span>
+            <div className="flex items-center gap-3">
+              <span>Card {currentIndex + 1} of {filteredCards.length}</span>
+              <button
+                onClick={() => handleDeleteCard(filteredCards[currentIndex].id)}
+                className="text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 normal-case font-normal transition-colors cursor-pointer bg-rose-500/10 px-2.5 py-0.5 rounded-md"
+                title="Delete this specific flashcard"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Delete Card</span>
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <span>{filteredCards[currentIndex].topic || 'General Vault'}</span>
               {filteredCards[currentIndex].document_id == null && (
@@ -217,6 +262,45 @@ export const StudentMemory: React.FC = () => {
               <span>Show Answer</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal replacing native browser alert */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 animate-fade-slide-in">
+            <div className="flex items-center justify-between">
+              <div className="p-2.5 bg-rose-500/10 text-rose-500 rounded-xl">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Clear Removed Cards?</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Are you sure you want to delete all flashcards whose source documents have been removed? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearOrphaned}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-medium transition-colors shadow-lg shadow-rose-600/20 cursor-pointer"
+              >
+                Yes, Clear Cards
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

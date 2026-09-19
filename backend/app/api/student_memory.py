@@ -179,3 +179,38 @@ async def generate_flashcard_from_snippet(
     except Exception as e:
         print(f"Snippet flashcard generation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/cards/{card_id}")
+async def delete_flashcard(
+    card_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(Flashcard).where(
+        Flashcard.id == card_id,
+        Flashcard.user_id == current_user.id,
+    )
+    card = (await db.execute(stmt)).scalar_one_or_none()
+    if not card:
+        raise HTTPException(status_code=404, detail="Flashcard not found")
+
+    await db.delete(card)
+    await db.commit()
+    return {"message": "Flashcard deleted successfully"}
+
+
+@router.delete("/orphaned")
+async def delete_orphaned_flashcards(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(Flashcard).where(
+        Flashcard.user_id == current_user.id,
+        Flashcard.document_id == None,
+    )
+    cards = (await db.execute(stmt)).scalars().all()
+    count = len(cards)
+    for card in cards:
+        await db.delete(card)
+    await db.commit()
+    return {"message": f"Successfully deleted {count} orphaned flashcard(s)", "count": count}
