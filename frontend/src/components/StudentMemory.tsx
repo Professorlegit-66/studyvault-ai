@@ -38,6 +38,7 @@ export const StudentMemory: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
 
   // Search & Filter State
@@ -87,14 +88,10 @@ export const StudentMemory: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Helper function to check if a card is an actual orphaned/removed card vs a valid snippet card
   const isCardOrphaned = useCallback((card: Flashcard) => {
-    // If document_id is null AND topic is either missing or empty, it's orphaned.
-    // If topic is specified (like custom title from snippet), it's a valid snippet card.
     return card.document_id == null && (!card.topic || card.topic.trim() === '');
   }, []);
 
-  // Topic status map to identify removed document topics
   const topicStatusMap = useMemo(() => {
     const statusMap = new Map<string, boolean>();
     flashcards.forEach((card) => {
@@ -118,7 +115,6 @@ export const StudentMemory: React.FC = () => {
     }));
   }, [topicStatusMap]);
 
-  // Filter flashcards by search query & selected topic
   const filteredCards = useMemo(() => {
     return flashcards.filter((card) => {
       const matchesSearch =
@@ -138,8 +134,9 @@ export const StudentMemory: React.FC = () => {
 
   const handleReview = useCallback(
     async (quality: number) => {
-      if (!currentCard) return;
+      if (!currentCard || submitting) return;
 
+      setSubmitting(true);
       try {
         await apiClient.post(`/memory/review/${currentCard.id}`, { quality });
         setIsFlipped(false);
@@ -153,9 +150,11 @@ export const StudentMemory: React.FC = () => {
         }
       } catch (err) {
         console.error('Failed to submit review:', err);
+      } finally {
+        setSubmitting(false);
       }
     },
-    [currentCard, currentIndex, filteredCards.length]
+    [currentCard, currentIndex, filteredCards.length, submitting]
   );
 
   const handleDeleteCard = async (cardId: number) => {
@@ -222,7 +221,7 @@ export const StudentMemory: React.FC = () => {
     }
   };
 
-  // Keyboard shortcut listener
+  // Keyboard shortcuts handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -238,17 +237,17 @@ export const StudentMemory: React.FC = () => {
       if (e.code === 'Space' || e.key === 'Enter') {
         e.preventDefault();
         setIsFlipped((prev) => !prev);
-      } else if (isFlipped) {
-        if (e.key === '1') handleReview(1);
-        else if (e.key === '2') handleReview(2);
-        else if (e.key === '3') handleReview(3);
-        else if (e.key === '4') handleReview(4);
+      } else if (isFlipped && !submitting) {
+        if (e.key === '1') handleReview(1);      // Again
+        else if (e.key === '2') handleReview(3); // Hard
+        else if (e.key === '3') handleReview(4); // Good
+        else if (e.key === '4') handleReview(5); // Easy
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFlipped, handleReview, showSnippetModal, showClearConfirm]);
+  }, [isFlipped, handleReview, showSnippetModal, showClearConfirm, submitting]);
 
   const progressPercent =
     flashcards.length > 0
@@ -257,7 +256,7 @@ export const StudentMemory: React.FC = () => {
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-3.5 animate-fadeIn pb-2 antialiased px-2 sm:px-4">
-      {/* Header & Global Toolbar (Single Line Layout) */}
+      {/* Header & Global Toolbar */}
       <div className="w-full flex items-center justify-between flex-nowrap gap-4">
         <div className="min-w-0 shrink">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2.5 whitespace-nowrap">
@@ -268,7 +267,6 @@ export const StudentMemory: React.FC = () => {
           </p>
         </div>
 
-        {/* Action Buttons Locked to One Line */}
         <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap shrink-0 ml-auto">
           {hasOrphanedCards && (
             <button
@@ -310,7 +308,7 @@ export const StudentMemory: React.FC = () => {
         </div>
       </div>
 
-      {/* Expanded Search & Topic Filter Bar */}
+      {/* Search & Topic Filter Bar */}
       {flashcards.length > 0 && (
         <div className="w-full bg-white dark:bg-slate-800/80 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs flex items-center gap-3 flex-wrap sm:flex-nowrap">
           <div className="relative flex-1 min-w-[240px]">
@@ -327,7 +325,6 @@ export const StudentMemory: React.FC = () => {
             />
           </div>
 
-          {/* Custom Filter Dropdown */}
           <div className="relative w-full sm:w-72" ref={dropdownRef}>
             <button
               type="button"
@@ -404,7 +401,6 @@ export const StudentMemory: React.FC = () => {
           </p>
         </div>
       ) : filteredCards.length === 0 ? (
-        /* Empty Queue State */
         <div className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center space-y-4 shadow-xs">
           <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle className="w-6 h-6" />
@@ -429,9 +425,7 @@ export const StudentMemory: React.FC = () => {
           </button>
         </div>
       ) : (
-        /* Compact Review Stage */
         <div className="w-full space-y-3">
-          {/* Progress Header */}
           <div className="w-full bg-white dark:bg-slate-800/60 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-xs flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-indigo-500" /> Card {currentIndex + 1} of {filteredCards.length}
@@ -439,9 +433,7 @@ export const StudentMemory: React.FC = () => {
             <span>{Math.round(progressPercent)}% Session Progress</span>
           </div>
 
-          {/* Flat Surface Container */}
           <div className="w-full bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/90 rounded-2xl p-4 sm:p-6 space-y-4 shadow-xs">
-            {/* Metadata Bar */}
             <div className="flex items-center justify-between flex-wrap gap-2 text-xs border-b border-slate-100 dark:border-slate-700 pb-3">
               <div className="flex items-center gap-3">
                 <span className="font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -481,7 +473,6 @@ export const StudentMemory: React.FC = () => {
               </div>
             </div>
 
-            {/* Viewport-Optimized 3D Stage */}
             <div
               onClick={() => setIsFlipped(!isFlipped)}
               className="relative min-h-[190px] sm:min-h-[220px] w-full cursor-pointer group"
@@ -518,7 +509,7 @@ export const StudentMemory: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Back Side (Answer) */}
+                {/* Back Side */}
                 <div
                   className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-5 sm:p-6 flex flex-col items-center justify-center text-center"
                   style={{
@@ -545,8 +536,9 @@ export const StudentMemory: React.FC = () => {
               <div className="space-y-2 pt-1">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <button
+                    disabled={submitting}
                     onClick={() => handleReview(1)}
-                    className="py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl text-xs transition-colors cursor-pointer flex flex-col items-center gap-0.5"
+                    className="py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl text-xs transition-colors cursor-pointer flex flex-col items-center gap-0.5 disabled:opacity-50"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Again</span>
@@ -556,8 +548,9 @@ export const StudentMemory: React.FC = () => {
                   </button>
 
                   <button
+                    disabled={submitting}
                     onClick={() => handleReview(3)}
-                    className="py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold rounded-xl text-xs transition-colors cursor-pointer flex flex-col items-center gap-0.5"
+                    className="py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold rounded-xl text-xs transition-colors cursor-pointer flex flex-col items-center gap-0.5 disabled:opacity-50"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Hard</span>
@@ -567,8 +560,9 @@ export const StudentMemory: React.FC = () => {
                   </button>
 
                   <button
+                    disabled={submitting}
                     onClick={() => handleReview(4)}
-                    className="py-2.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl text-xs transition-colors cursor-pointer flex flex-col items-center gap-0.5"
+                    className="py-2.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl text-xs transition-colors cursor-pointer flex flex-col items-center gap-0.5 disabled:opacity-50"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Good</span>
@@ -578,8 +572,9 @@ export const StudentMemory: React.FC = () => {
                   </button>
 
                   <button
+                    disabled={submitting}
                     onClick={() => handleReview(5)}
-                    className="py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold rounded-xl text-xs transition-colors cursor-pointer flex flex-col items-center gap-0.5"
+                    className="py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold rounded-xl text-xs transition-colors cursor-pointer flex flex-col items-center gap-0.5 disabled:opacity-50"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Easy</span>
@@ -600,7 +595,6 @@ export const StudentMemory: React.FC = () => {
             )}
           </div>
 
-          {/* Keyboard Hints Footer */}
           <div className="flex items-center justify-center gap-6 text-[11px] text-slate-600 dark:text-slate-400 font-medium pt-0.5">
             <span className="flex items-center gap-1.5">
               <Keyboard className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
@@ -619,7 +613,7 @@ export const StudentMemory: React.FC = () => {
         </div>
       )}
 
-      {/* Confirmation Modal for Clearing Orphaned Cards */}
+      {/* Confirmation Modal */}
       {showClearConfirm && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 animate-scaleUp">

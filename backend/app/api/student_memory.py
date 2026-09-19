@@ -10,8 +10,8 @@ from app.api.deps import get_current_user
 from app.database import get_db
 from app.models.chunk import DocumentChunk
 from app.models.document import Document
-from app.models.student_memory import Flashcard
 from app.models.review_log import ReviewLog
+from app.models.student_memory import Flashcard
 from app.models.user import User
 from app.services.flashcard_gen import generate_flashcards_from_text
 from app.services.sm2 import calculate_sm2
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/memory", tags=["Student Memory"])
 
 
 class ReviewRequest(BaseModel):
-    quality: int  # 0 to 5 SM-2 rating
+    quality: int  # 0 to 5 SM-2 rating quality score
 
 
 class SnippetFlashcardRequest(BaseModel):
@@ -88,18 +88,34 @@ async def review_flashcard(
     card.next_review_at = next_review
     card.last_reviewed_at = now
 
-    # Log review activity
-    review_entry = ReviewLog(
-        user_id=current_user.id,
-        flashcard_id=card.id,
-        quality=payload.quality,
-        reviewed_at=now,
-    )
-    db.add(review_entry)
+    # Map numerical SM-2 quality score to string label for ReviewLog table
+    quality_map = {1: "again", 2: "again", 3: "hard", 4: "good", 5: "easy"}
+    rating_label = quality_map.get(payload.quality, "good")
 
-    await db.commit()
-    await db.refresh(card)
-    return card
+    # Log review activity inside an isolated nested transaction (savepoint)
+    try:
+        async with db.begin_nested():
+            review_entry = ReviewLog(
+                user_id=current_user.id,
+                flashcard_id=card.id,
+                rating=rating_label,
+                reviewed_at=now,
+            )
+            db.add(review_entry)
+    except Exception as log_err:
+        print(f"[Student Memory] ReviewLog insert warning: {log_err}")
+
+    try:
+        await db.commit()
+        await db.refresh(card)
+        return card
+    except Exception as commit_err:
+        await db.rollback()
+        print(f"[Student Memory] Review commit error: {commit_err}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to record review progress.",
+        )
 
 
 @router.post("/generate/{document_id}")
