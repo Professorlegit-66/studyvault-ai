@@ -3,7 +3,6 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from app.models.review_log import ReviewLog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +11,7 @@ from app.database import get_db
 from app.models.chunk import DocumentChunk
 from app.models.document import Document
 from app.models.student_memory import Flashcard
+from app.models.review_log import ReviewLog
 from app.models.user import User
 from app.services.flashcard_gen import generate_flashcards_from_text
 from app.services.sm2 import calculate_sm2
@@ -80,11 +80,22 @@ async def review_flashcard(
         ease_factor=card.ease_factor,
     )
 
+    now = datetime.now(timezone.utc)
+
     card.repetition_number = rep
     card.interval_days = interval
     card.ease_factor = ef
     card.next_review_at = next_review
-    card.last_reviewed_at = datetime.now(timezone.utc)
+    card.last_reviewed_at = now
+
+    # Log review activity
+    review_entry = ReviewLog(
+        user_id=current_user.id,
+        flashcard_id=card.id,
+        quality=payload.quality,
+        reviewed_at=now,
+    )
+    db.add(review_entry)
 
     await db.commit()
     await db.refresh(card)
@@ -215,46 +226,3 @@ async def delete_orphaned_flashcards(
         await db.delete(card)
     await db.commit()
     return {"message": f"Successfully deleted {count} orphaned flashcard(s)", "count": count}
-
-@router.post("/review/{card_id}", response_model=FlashcardResponse)
-async def review_flashcard(
-    card_id: int,
-    payload: ReviewRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    stmt = select(Flashcard).where(
-        Flashcard.id == card_id,
-        Flashcard.user_id == current_user.id,
-    )
-    card = (await db.execute(stmt)).scalar_one_or_none()
-    if not card:
-        raise HTTPException(status_code=404, detail="Flashcard not found")
-
-    rep, interval, ef, next_review = calculate_sm2(
-        quality=payload.quality,
-        repetition=card.repetition_number,
-        interval=card.interval_days,
-        ease_factor=card.ease_factor,
-    )
-
-    now = datetime.now(timezone.utc)
-
-    card.repetition_number = rep
-    card.interval_days = interval
-    card.ease_factor = ef
-    card.next_review_at = next_review
-    card.last_reviewed_at = now
-
-    # Append immutable history entry
-    review_entry = ReviewLog(
-        user_id=current_user.id,
-        flashcard_id=card.id,
-        quality=payload.quality,
-        reviewed_at=now,
-    )
-    db.add(review_entry)
-
-    await db.commit()
-    await db.refresh(card)
-    return card
