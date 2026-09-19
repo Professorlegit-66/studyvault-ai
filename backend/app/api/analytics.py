@@ -7,6 +7,13 @@ from app.models.student_memory import Flashcard
 from app.models.user import User
 from app.api.deps import get_current_user
 
+# Safely handle ReviewLog import
+try:
+    from app.models.review_log import ReviewLog
+    HAS_REVIEW_LOG = True
+except ImportError:
+    HAS_REVIEW_LOG = False
+
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 @router.get("/summary")
@@ -15,53 +22,59 @@ async def get_analytics_summary(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        # Strictly fetch flashcards belonging to the logged-in user
-        stmt = select(Flashcard).where(Flashcard.user_id == current_user.id)
-        cards = (await db.execute(stmt)).scalars().all()
-
-        if not cards:
-            return {
-                "retention_score": 0,
-                "current_streak": current_user.current_streak or 1,
-                "total_reviews": 0,
-                "heatmap": []
-            }
+        # 1. Fetch user flashcards
+        cards_stmt = select(Flashcard).where(Flashcard.user_id == current_user.id)
+        cards = (await db.execute(cards_stmt)).scalars().all()
 
         date_counts = {}
-        total_reviews = 0
-        total_ease = 0.0
-        reviewed_cards_count = 0
+        logs = []
 
+        # 2. Attempt to query ReviewLog table if model exists
+        if HAS_REVIEW_LOG:
+            try:
+                logs_stmt = select(ReviewLog).where(ReviewLog.user_id == current_user.id)
+                logs = (await db.execute(logs_stmt)).scalars().all()
+                
+                for log in logs:
+                    dt = log.reviewed_at
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    date_str = dt.astimezone().strftime("%Y-%m-%d")
+                    date_counts[date_str] = date_counts.get(date_str, 0) + 1
+            except Exception as log_err:
+                # Table does not exist in DB yet; rollback transaction to keep connection clean
+                await db.rollback()
+
+        # 3. Merge/Fallback to legacy Flashcard timestamps
         for card in cards:
-            total_ease += card.ease_factor
-            
             if card.last_reviewed_at:
-                reviewed_cards_count += 1
                 dt = card.last_reviewed_at
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
-                
-                local_dt = dt.astimezone()
-                date_str = local_dt.strftime("%Y-%m-%d")
-                date_counts[date_str] = date_counts.get(date_str, 0) + 1
-                total_reviews += 1
+                date_str = dt.astimezone().strftime("%Y-%m-%d")
+                if date_str not in date_counts:
+                    date_counts[date_str] = 1
 
         heatmap = [{"date": d, "count": c} for d, c in date_counts.items()]
+        total_reviews = max(len(logs), sum(date_counts.values()))
 
-        # Dynamic user-specific retention calculation
-        avg_ease = total_ease / len(cards)
-        ease_score = min(100.0, (avg_ease / 2.5) * 100)
-        reviewed_ratio = (reviewed_cards_count / len(cards)) * 100
-
-        if reviewed_cards_count > 0:
-            user_retention = round((0.7 * ease_score) + (0.3 * reviewed_ratio))
+        # 4. Retention calculation
+        if cards:
+            total_ease = sum(c.ease_factor for c in cards)
+            avg_ease = total_ease / len(cards)
+            ease_score = min(100.0, (avg_ease / 2.5) * 100)
+            
+            reviewed_count = sum(1 for c in cards if c.last_reviewed_at is not None)
+            reviewed_ratio = (reviewed_count / len(cards)) * 100
+            
+            retention_score = round((0.7 * ease_score) + (0.3 * reviewed_ratio)) if reviewed_count > 0 else 0
         else:
-            user_retention = 0
+            retention_score = 0
 
         streak = current_user.current_streak if (current_user.current_streak and current_user.current_streak > 0) else 1
 
         return {
-            "retention_score": min(100, max(0, user_retention)),
+            "retention_score": min(100, max(0, retention_score)),
             "current_streak": streak,
             "total_reviews": total_reviews,
             "heatmap": heatmap
