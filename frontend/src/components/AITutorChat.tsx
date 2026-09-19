@@ -1,10 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { apiClient } from '../api/client';
 import type { Document } from './DocumentManager';
-import { Send, Bot, User, Loader2, Sparkles, BookOpen, Filter, Check, ChevronDown, Layers, FileText } from 'lucide-react';
+import {
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Sparkles,
+  BookOpen,
+  Filter,
+  Check,
+  ChevronDown,
+  Layers,
+  FileText,
+  Trash2
+} from 'lucide-react';
 
 export interface Message {
+  id?: number | string;
   sender: 'user' | 'ai';
   text: string;
   sources?: string[];
@@ -16,6 +30,39 @@ interface AITutorChatProps {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
+const DEFAULT_GREETING: Message = {
+  id: 'greeting',
+  sender: 'ai',
+  text: 'Hello! I am your AI Tutor. Ask me any question about your uploaded documents, or select specific files above to focus our discussion.'
+};
+
+const MARKDOWN_COMPONENTS = {
+  h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+  h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+  h3: ({ node, ...props }: any) => (
+    <h3 className="text-md font-bold mt-2 mb-1 text-indigo-600 dark:text-indigo-400" {...props} />
+  ),
+  p: ({ node, ...props }: any) => <p className="mb-2 leading-relaxed" {...props} />,
+  ul: ({ node, ...props }: any) => <ul className="list-disc pl-5 space-y-1 mb-2" {...props} />,
+  ol: ({ node, ...props }: any) => <ol className="list-decimal pl-5 space-y-1 mb-2" {...props} />,
+  li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
+  strong: ({ node, ...props }: any) => (
+    <strong className="font-bold text-slate-900 dark:text-slate-100" {...props} />
+  ),
+  code: ({ node, inline, ...props }: any) =>
+    inline ? (
+      <code
+        className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[13px] text-pink-600 dark:text-pink-400 font-mono"
+        {...props}
+      />
+    ) : (
+      <code
+        className="block bg-slate-800 text-slate-50 p-3 rounded-lg text-[13px] overflow-x-auto my-2 font-mono"
+        {...props}
+      />
+    ),
+};
+
 export const AITutorChat: React.FC<AITutorChatProps> = ({
   documents,
   messages,
@@ -26,8 +73,10 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const previousDocKeyRef = useRef<string>('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,9 +86,44 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     scrollToBottom();
   }, [messages, loading]);
 
+  // Load chat history only when document selection actually changes
+  const loadChatHistory = useCallback(async () => {
+    const activeDocId =
+      ragMode === 'single' && selectedIds.length > 0 ? selectedIds[0] : null;
+    const currentDocKey = activeDocId ? `doc_${activeDocId}` : 'global';
+
+    // Avoid refetching if selection target hasn't changed
+    if (previousDocKeyRef.current === currentDocKey && messages.length > 0) {
+      return;
+    }
+    previousDocKeyRef.current = currentDocKey;
+
+    try {
+      const url = activeDocId
+        ? `/rag/history?document_id=${activeDocId}`
+        : `/rag/history`;
+      const res = await apiClient.get<Message[]>(url);
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setMessages(res.data);
+      } else {
+        setMessages([DEFAULT_GREETING]);
+      }
+    } catch (err) {
+      console.error('Failed to load chat history:', err);
+      setMessages([DEFAULT_GREETING]);
+    }
+  }, [ragMode, selectedIds, messages.length, setMessages]);
+
+  useEffect(() => {
+    loadChatHistory();
+  }, [loadChatHistory]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
     };
@@ -48,8 +132,11 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
   }, []);
 
   const handleModeSwitch = (mode: 'single' | 'multi') => {
+    if (ragMode === mode) return;
     setRagMode(mode);
-    setSelectedIds([]);
+    if (mode === 'single' && selectedIds.length > 1) {
+      setSelectedIds([selectedIds[0]]);
+    }
   };
 
   const handleToggleDoc = (id: string) => {
@@ -59,13 +146,9 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       return;
     }
 
-    setSelectedIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id);
-      } else {
-        return [...prev, id];
-      }
-    });
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
   };
 
   const handleSelectAll = () => {
@@ -73,10 +156,22 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     setSelectedIds(documents.map((d) => String(d.id)));
   };
 
-  const getDropdownLabel = () => {
-    if (selectedIds.length === 0) {
-      return 'Select Document...';
+  const handleClearHistory = async () => {
+    try {
+      const activeDocId =
+        ragMode === 'single' && selectedIds.length > 0 ? selectedIds[0] : null;
+      const url = activeDocId
+        ? `/rag/history?document_id=${activeDocId}`
+        : `/rag/history`;
+      await apiClient.delete(url);
+      setMessages([DEFAULT_GREETING]);
+    } catch (err) {
+      console.error('Failed to clear chat history:', err);
     }
+  };
+
+  const getDropdownLabel = useMemo(() => {
+    if (selectedIds.length === 0) return 'Select Document...';
     if (selectedIds.length === 1) {
       const doc = documents.find((d) => String(d.id) === selectedIds[0]);
       return doc ? doc.title : '1 Document Selected';
@@ -85,7 +180,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       return 'All Vault Documents';
     }
     return `${selectedIds.length} Documents Selected`;
-  };
+  }, [selectedIds, documents]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,12 +188,19 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
 
     const userQuery = input.trim();
     setInput('');
-    setMessages((prev) => [...prev, { sender: 'user', text: userQuery }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now(), sender: 'user', text: userQuery },
+    ]);
     setLoading(true);
 
     try {
-      const payload: { query: string; document_id?: number; document_ids?: number[] } = { query: userQuery };
-      
+      const payload: {
+        query: string;
+        document_id?: number;
+        document_ids?: number[];
+      } = { query: userQuery };
+
       if (ragMode === 'single') {
         if (selectedIds.length > 0) {
           payload.document_id = Number(selectedIds[0]);
@@ -114,6 +216,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       setMessages((prev) => [
         ...prev,
         {
+          id: Date.now() + 1,
           sender: 'ai',
           text: response.data.answer,
           sources: response.data.sources,
@@ -128,6 +231,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       setMessages((prev) => [
         ...prev,
         {
+          id: Date.now() + 2,
           sender: 'ai',
           text: `⚠️ **System Message:**\n${errorMessage}`,
         },
@@ -137,7 +241,8 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     }
   };
 
-  const isAllSelected = documents.length > 0 && selectedIds.length === documents.length;
+  const isAllSelected =
+    documents.length > 0 && selectedIds.length === documents.length;
 
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col h-full min-h-0 transition-colors duration-300">
@@ -150,18 +255,32 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               AI Tutor Chat <Sparkles className="w-4 h-4 text-amber-500" />
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Grounded strictly in your study vault</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Grounded strictly in your study vault
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          {messages.length > 1 && (
+            <button
+              onClick={handleClearHistory}
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
+              title="Clear chat history"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Clear Chat</span>
+            </button>
+          )}
+
           <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0">
             <button
               type="button"
               onClick={() => handleModeSwitch('single')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 ragMode === 'single'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
               }`}
               title="Single Document Mode"
@@ -174,7 +293,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
               onClick={() => handleModeSwitch('multi')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 ragMode === 'multi'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
               }`}
               title="Multi-Document Mode"
@@ -192,9 +311,13 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
             >
               <div className="flex items-center gap-2 truncate">
                 <Filter className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                <span className="truncate">{getDropdownLabel()}</span>
+                <span className="truncate">{getDropdownLabel}</span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${
+                  isDropdownOpen ? 'rotate-180' : ''
+                }`}
+              />
             </button>
 
             {isDropdownOpen && (
@@ -206,7 +329,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
                       onClick={handleSelectAll}
                       className={`flex-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer text-center ${
                         isAllSelected
-                          ? 'bg-indigo-600 text-white shadow-sm'
+                          ? 'bg-indigo-600 text-white shadow-xs'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
@@ -223,7 +346,9 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
                 )}
 
                 {documents.length === 0 ? (
-                  <div className="px-3 py-2 text-xs text-slate-400 text-center">No documents uploaded</div>
+                  <div className="px-3 py-2 text-xs text-slate-400 text-center">
+                    No documents uploaded
+                  </div>
                 ) : (
                   documents.map((doc) => {
                     const isSelected = selectedIds.includes(String(doc.id));
@@ -238,7 +363,9 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
                         }`}
                       >
                         <span className="truncate pr-2">{doc.title}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                        {isSelected && (
+                          <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        )}
                       </div>
                     );
                   })
@@ -251,7 +378,12 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
 
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 flex flex-col gap-4">
         {messages.map((msg, idx) => (
-          <div key={idx} className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div
+            key={msg.id ?? `msg-${idx}`}
+            className={`flex gap-3 ${
+              msg.sender === 'user' ? 'justify-end' : 'justify-start'
+            }`}
+          >
             {msg.sender === 'ai' && (
               <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit">
                 <Bot className="w-4 h-4" />
@@ -267,25 +399,8 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
               {msg.sender === 'user' ? (
                 <span className="whitespace-pre-wrap">{msg.text}</span>
               ) : (
-                <div className="space-y-3 leading-relaxed">
-                  <ReactMarkdown
-                    components={{
-                      h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
-                      h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
-                      h3: ({ node, ...props }) => <h3 className="text-md font-bold mt-2 mb-1 text-indigo-600 dark:text-indigo-400" {...props} />,
-                      p: ({ node, ...props }) => <p className="mb-2" {...props} />,
-                      ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-1 mb-2" {...props} />,
-                      ol: ({ node, ...props }) => <ol className="list-decimal pl-5 space-y-1 mb-2" {...props} />,
-                      li: ({ node, ...props }) => <li className="pl-1" {...props} />,
-                      strong: ({ node, ...props }) => <strong className="font-bold text-slate-900 dark:text-slate-100" {...props} />,
-                      code: ({ node, inline, ...props }: any) =>
-                        inline ? (
-                          <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[13px] text-pink-600 dark:text-pink-400" {...props} />
-                        ) : (
-                          <code className="block bg-slate-800 text-slate-50 p-3 rounded-lg text-[13px] overflow-x-auto my-2" {...props} />
-                        ),
-                    }}
-                  >
+                <div className="space-y-2 leading-relaxed">
+                  <ReactMarkdown components={MARKDOWN_COMPONENTS}>
                     {msg.text}
                   </ReactMarkdown>
                 </div>
