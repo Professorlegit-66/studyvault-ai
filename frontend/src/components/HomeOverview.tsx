@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { Brain, FileText, ArrowRight, Flame, Activity, Clock } from 'lucide-react';
+import { Brain, FileText, ArrowRight, Flame, Activity, Clock, Calendar as CalendarIcon } from 'lucide-react';
 
 interface HomeOverviewProps {
   userName: string;
   documentCount: number;
-  onNavigate: (tab: 'home' | 'documents' | 'memory' | 'chat') => void;
+  onNavigate: (tab: 'home' | 'documents' | 'memory' | 'chat' | 'companion') => void;
 }
 
 interface ActivityItem {
@@ -15,23 +15,26 @@ interface ActivityItem {
   created_at?: string;
 }
 
+interface HeatmapDay {
+  date: string;
+  count: number;
+}
+
 export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCount, onNavigate }) => {
   const [recentDocs, setRecentDocs] = useState<ActivityItem[]>([]);
   const [cardCount, setCardCount] = useState(0);
   const [masteryPercent, setMasteryPercent] = useState<number | null>(null);
   const [streakDays, setStreakDays] = useState<number | null>(null);
+  const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
+  const [totalContributions, setTotalContributions] = useState<number>(0);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const availableYears = [2026, 2025];
 
   useEffect(() => {
     const fetchOverviewData = async () => {
       try {
         const [docsRes, memoryRes, analyticsRes] = await Promise.all([
-          // No trailing slash - the documents router is declared as
-          // prefix="/documents" with route "", so the real path is
-          // "/api/documents". The trailing-slash version worked by
-          // accident via a 307 redirect that axios silently followed,
-          // but that's an extra unnecessary round-trip and a fragile
-          // dependency on the browser/axios forwarding CORS headers
-          // through the redirect correctly.
           apiClient.get('/documents'),
           apiClient.get('/memory/due'),
           apiClient.get('/analytics/summary')
@@ -42,18 +45,91 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
         if (Array.isArray(memoryRes.data)) {
           setCardCount(memoryRes.data.length);
         }
-        if (analyticsRes.data && typeof analyticsRes.data.retention_score === 'number') {
-          setMasteryPercent(analyticsRes.data.retention_score);
-        }
-        if (analyticsRes.data && typeof analyticsRes.data.current_streak === 'number') {
-          setStreakDays(analyticsRes.data.current_streak);
+        if (analyticsRes.data) {
+          if (typeof analyticsRes.data.retention_score === 'number') {
+            setMasteryPercent(analyticsRes.data.retention_score);
+          }
+          if (typeof analyticsRes.data.current_streak === 'number') {
+            setStreakDays(analyticsRes.data.current_streak);
+          }
+          const realHeatmap = Array.isArray(analyticsRes.data.heatmap) ? analyticsRes.data.heatmap : [];
+          buildYearHeatmap(selectedYear, realHeatmap);
+        } else {
+          buildYearHeatmap(selectedYear, []);
         }
       } catch (err) {
         console.error('Failed to load overview data', err);
+        buildYearHeatmap(selectedYear, []);
       }
     };
     fetchOverviewData();
-  }, []);
+  }, [selectedYear]);
+
+  const buildYearHeatmap = (year: number, realData: HeatmapDay[]) => {
+    const daysMap = new Map<string, number>();
+    let yearTotal = 0;
+    realData.forEach(item => {
+      daysMap.set(item.date, item.count);
+      if (item.date.startsWith(year.toString())) {
+        yearTotal += item.count;
+      }
+    });
+    setTotalContributions(yearTotal);
+
+    const days: HeatmapDay[] = [];
+    
+    // Start from Jan 1 and align back to the nearest Monday
+    const startDate = new Date(year, 0, 1);
+    const startDay = startDate.getDay();
+    const diffToMon = startDay === 0 ? -6 : 1 - startDay;
+    startDate.setDate(startDate.getDate() + diffToMon);
+
+    // End strictly on Dec 31 for past years, or today for current year
+    const isCurrentYear = year === new Date().getFullYear();
+    const endDate = isCurrentYear ? new Date() : new Date(year, 11, 31);
+
+    let curr = new Date(startDate);
+    while (curr <= endDate) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      const d = String(curr.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+
+      const count = y === year ? (daysMap.get(dateStr) || 0) : 0;
+      days.push({ date: dateStr, count });
+      curr.setDate(curr.getDate() + 1);
+    }
+    setHeatmapData(days);
+  };
+
+  const getHeatmapColor = (count: number) => {
+    if (count === 0) return 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60';
+    if (count <= 2) return 'bg-indigo-300 dark:bg-indigo-700 border border-indigo-400 dark:border-indigo-600/50';
+    if (count <= 4) return 'bg-indigo-500 dark:bg-indigo-500 border border-indigo-600 dark:border-indigo-400/50';
+    return 'bg-indigo-700 dark:bg-indigo-400 border border-indigo-800 dark:border-indigo-300 shadow-xs shadow-indigo-400/30';
+  };
+
+  const weeks: HeatmapDay[][] = [];
+  for (let i = 0; i < heatmapData.length; i += 7) {
+    weeks.push(heatmapData.slice(i, i + 7));
+  }
+
+  const monthLabels: { label: string; weekIndex: number }[] = [];
+  let lastMonth = -1;
+  weeks.forEach((week, idx) => {
+    if (week.length > 0) {
+      const validDay = week.find(d => new Date(d.date).getFullYear() === selectedYear) || week[0];
+      const d = new Date(validDay.date);
+      const m = d.getMonth();
+      if (m !== lastMonth && d.getFullYear() === selectedYear) {
+        monthLabels.push({
+          label: d.toLocaleString('default', { month: 'short' }),
+          weekIndex: idx
+        });
+        lastMonth = m;
+      }
+    }
+  });
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -122,6 +198,89 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
           <span>Start Reviewing</span>
           <ArrowRight className="w-4 h-4" />
         </button>
+      </div>
+
+      {/* Perfectly Scaled Heatmap */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-xl space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100 dark:border-slate-700/50">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <CalendarIcon className="w-4 h-4 text-indigo-500" /> {totalContributions} reviews in {selectedYear}
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Active recall consistency and review history</p>
+          </div>
+          
+          <div className="flex items-center gap-1.5">
+            {availableYears.map((year) => (
+              <button
+                key={year}
+                onClick={() => setSelectedYear(year)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  selectedYear === year
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+                }`}
+              >
+                {year}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 overflow-x-auto custom-scrollbar">
+          <div className="flex flex-col gap-1.5 py-1 w-fit">
+            {/* Month labels row */}
+            <div className="flex text-[10px] text-slate-400 dark:text-slate-500 font-medium pl-7 relative h-3.5">
+              {monthLabels.map((m, idx) => (
+                <span
+                  key={idx}
+                  className="absolute"
+                  style={{ left: `${m.weekIndex * 16 + 28}px` }}
+                >
+                  {m.label}
+                </span>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              {/* Weekday labels column */}
+              <div className="flex flex-col justify-between text-[10px] text-slate-400 dark:text-slate-500 font-medium pr-1 py-0.5 h-[102px]">
+                <span>Mon</span>
+                <span>Wed</span>
+                <span>Fri</span>
+              </div>
+
+              {/* Heatmap grid */}
+              <div className="flex gap-1">
+                {weeks.map((week, weekIdx) => (
+                  <div key={weekIdx} className="flex flex-col gap-1">
+                    {week.map((day, dayIdx) => (
+                      <div
+                        key={dayIdx}
+                        className={`w-3 h-3 rounded-[3px] transition-transform hover:scale-125 cursor-pointer ${getHeatmapColor(day.count)}`}
+                        title={`${day.date}: ${day.count} review(s)`}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
+          <span className="text-[11px]">{totalContributions} total review actions recorded</span>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/60 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px]">
+            <span>Less</span>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-[3px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60" />
+              <div className="w-3 h-3 rounded-[3px] bg-indigo-300 dark:bg-indigo-700" />
+              <div className="w-3 h-3 rounded-[3px] bg-indigo-500 dark:bg-indigo-500" />
+              <div className="w-3 h-3 rounded-[3px] bg-indigo-700 dark:bg-indigo-400" />
+            </div>
+            <span>More</span>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
