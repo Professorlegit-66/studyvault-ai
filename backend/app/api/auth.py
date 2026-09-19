@@ -1,18 +1,20 @@
-from datetime import date, datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel, EmailStr
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, EmailStr
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
+from app.core.security import create_access_token, get_password_hash, verify_password
 from app.database import get_db
 from app.models.user import User
-from app.core.security import verify_password, get_password_hash, create_access_token
-from app.api.deps import get_current_user
-from app.services.email_service import generate_otp, send_verification_email, OTP_EXPIRY_MINUTES
+from app.services.email_service import OTP_EXPIRY_MINUTES, generate_otp, send_verification_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -20,53 +22,71 @@ class UserCreate(BaseModel):
     name: Optional[str] = None
     full_name: Optional[str] = None
 
+
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     hide_security_warning: Optional[bool] = None
 
+
 class UserResponse(BaseModel):
     id: int
     email: str
     name: str
     pending_email: Optional[str] = None
-    # Lets the frontend permanently suppress the post-login sensitive-data
-    # warning banner once the user has checked "Don't show this again".
     hide_security_warning: bool = False
 
     class Config:
         from_attributes = True
 
+
 class Token(BaseModel):
     access_token: str
     token_type: str
+
 
 class RegisterResponse(BaseModel):
     message: str
     email: str
 
+
 class VerifyEmailRequest(BaseModel):
     email: EmailStr
     code: str
 
+
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
+
 
 class ConfirmEmailChangeRequest(BaseModel):
     code: str
 
 
 def _issue_and_send_otp(user: User, target_email: Optional[str] = None) -> None:
-    """Generates a fresh OTP, stores it with an expiry, and emails it.
-
-    Sends to target_email when given (used for email-change verification,
-    where the code must go to the *new*, unconfirmed address rather than
-    user.email), otherwise sends to user.email (registration/resend)."""
     code = generate_otp()
     user.verification_code = code
     user.verification_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)
     send_verification_email(to_email=target_email or user.email, otp_code=code, user_name=user.name)
+
+
+def _update_login_streak(user: User) -> None:
+    """Updates user.current_streak and user.last_login_date in place."""
+    today = datetime.now(timezone.utc).date()
+
+    if user.last_login_date is None:
+        user.current_streak = 1
+    elif user.last_login_date == today:
+        # Self-repair: If the user is active today but streak is stuck at 0, restore it to 1
+        if not user.current_streak or user.current_streak == 0:
+            user.current_streak = 1
+    elif user.last_login_date == today - timedelta(days=1):
+        user.current_streak = (user.current_streak or 0) + 1
+    else:
+        user.current_streak = 1
+
+    user.last_login_date = today
 
 
 @router.post("/register", response_model=RegisterResponse)
@@ -80,8 +100,8 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         )
 
     display_name = user_data.name or user_data.full_name or "Student"
-
     hashed_pwd = get_password_hash(user_data.password)
+
     new_user = User(
         email=user_data.email,
         hashed_password=hashed_pwd,
@@ -89,7 +109,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         is_verified=False,
     )
     db.add(new_user)
-    await db.flush()  # assigns new_user.id without committing yet
+    await db.flush()
 
     try:
         _issue_and_send_otp(new_user)
@@ -102,7 +122,6 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         )
 
     await db.commit()
-
     return RegisterResponse(
         message="Account created. Check your email for a verification code.",
         email=new_user.email,
@@ -135,8 +154,6 @@ async def verify_email(payload: VerifyEmailRequest, db: AsyncSession = Depends(g
     _update_login_streak(user)
     await db.commit()
 
-    # Verification succeeds straight into a logged-in session, so the user
-    # doesn't have to separately log in right after verifying.
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -165,35 +182,11 @@ async def resend_verification(payload: ResendVerificationRequest, db: AsyncSessi
     return {"message": "A new verification code has been sent."}
 
 
-def _update_login_streak(user: User) -> None:
-    """
-    Updates user.current_streak and user.last_login_date in place, based on
-    today's date (UTC) vs. the last recorded login date.
-
-    - No previous login (or streak was already broken/reset) -> streak = 1
-    - Already logged in today -> no change (prevents multiple logins/day from
-      inflating the streak)
-    - Last login was yesterday -> streak += 1
-    - Last login was any earlier date -> streak resets to 1
-    """
-    today = datetime.now(timezone.utc).date()
-
-    if user.last_login_date is None:
-        user.current_streak = 1
-    elif user.last_login_date == today:
-        pass  # already counted today, don't double-increment
-    elif user.last_login_date == today - timedelta(days=1):
-        user.current_streak += 1
-    else:
-        user.current_streak = 1
-
-    user.last_login_date = today
-
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.email == form_data.username)
     user = (await db.execute(stmt)).scalar_one_or_none()
-    
+
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -213,6 +206,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @router.get("/me", response_model=UserResponse)
 async def get_me(
     current_user: User = Depends(get_current_user),
@@ -222,6 +216,7 @@ async def get_me(
     await db.commit()
     await db.refresh(current_user)
     return current_user
+
 
 @router.put("/me", response_model=UserResponse)
 async def update_user_profile(
@@ -256,8 +251,6 @@ async def update_user_profile(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Could not send a verification code to the new email. Please try again shortly.",
             )
-        # current_user.email is deliberately left untouched here - it only
-        # changes once the code is confirmed via /auth/confirm-email-change.
 
     await db.commit()
     await db.refresh(current_user)

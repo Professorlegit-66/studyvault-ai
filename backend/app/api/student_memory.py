@@ -1,24 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
 from app.database import get_db
-from app.models.document import Document
 from app.models.chunk import DocumentChunk
+from app.models.document import Document
 from app.models.student_memory import Flashcard
 from app.models.user import User
-from app.api.deps import get_current_user
-from app.services.sm2 import calculate_sm2
 from app.services.flashcard_gen import generate_flashcards_from_text
+from app.services.sm2 import calculate_sm2
 
 router = APIRouter(prefix="/memory", tags=["Student Memory"])
 
 
 class ReviewRequest(BaseModel):
-    quality: int  # 0 to 5 rating
+    quality: int  # 0 to 5 SM-2 rating
 
 
 class SnippetFlashcardRequest(BaseModel):
@@ -107,8 +108,6 @@ async def generate_cards_for_doc(
         raise HTTPException(status_code=404, detail="Document not found")
 
     try:
-        # Pull real extracted text from chunks (same source used for RAG Q&A)
-        # instead of a generic placeholder, so flashcards are actually grounded.
         chunk_rows = (
             await db.execute(
                 select(DocumentChunk.content)
@@ -179,6 +178,7 @@ async def generate_flashcard_from_snippet(
     except Exception as e:
         print(f"Snippet flashcard generation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.delete("/cards/{card_id}")
 async def delete_flashcard(
