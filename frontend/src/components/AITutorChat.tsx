@@ -1,4 +1,3 @@
-// src/components/AITutorChat.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { apiClient } from '../api/client';
@@ -24,7 +23,6 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const [ragMode, setRagMode] = useState<'single' | 'multi'>('single');
-  // Initialize to empty or single default instead of auto-selecting 'all'
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,7 +49,6 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
 
   const handleModeSwitch = (mode: 'single' | 'multi') => {
     setRagMode(mode);
-    // Reset selection when switching modes so the user makes a deliberate choice
     setSelectedIds([]);
   };
 
@@ -62,7 +59,6 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       return;
     }
 
-    // Multi mode toggle logic
     setSelectedIds((prev) => {
       if (prev.includes(id)) {
         return prev.filter((item) => item !== id);
@@ -144,8 +140,8 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
   const isAllSelected = documents.length > 0 && selectedIds.length === documents.length;
 
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col h-[calc(100vh-8rem)] transition-colors duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col h-full min-h-0 transition-colors duration-300">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <div className="p-2.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0">
             <Bot className="w-6 h-6" />
@@ -158,9 +154,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
           </div>
         </div>
 
-        {/* Controls: Mode Switcher + Scoping Dropdown */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {/* Mode Toggle Pill */}
           <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0">
             <button
               type="button"
@@ -190,7 +184,6 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
             </button>
           </div>
 
-          {/* Scoping Dropdown */}
           <div className="relative flex-1 sm:w-60" ref={dropdownRef}>
             <button
               type="button"
@@ -205,7 +198,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
             </button>
 
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto p-1.5 space-y-1">
+              <div className="absolute right-0 mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto p-1.5 custom-scrollbar flex flex-col gap-1">
                 {ragMode === 'multi' && (
                   <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-200 dark:border-slate-800 pb-2 mb-1 gap-2">
                     <button
@@ -256,7 +249,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 flex flex-col gap-4">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.sender === 'ai' && (
@@ -322,10 +315,10 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-0 shrink-0" />
       </div>
 
-      <form onSubmit={handleSend} className="flex gap-2">
+      <form onSubmit={handleSend} className="flex gap-2 shrink-0">
         <input
           type="text"
           value={input}

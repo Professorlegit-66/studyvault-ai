@@ -22,13 +22,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'documents' | 'memory' | 'chat' | 'companion'>('home');
   const [documents, setDocuments] = useState<Document[]>([]);
 
-  // On desktop this toggles the sidebar between expanded (w-64) and
-  // collapsed-to-icons (w-20), always visible, as before. On mobile
-  // (below the md breakpoint) it instead toggles a slide-in overlay that
-  // sits off-screen by default - previously the sidebar always occupied
-  // real width in the layout's flex row regardless of screen size, which
-  // pushed main content wider than the viewport and caused horizontal
-  // scrolling on phones (see the mobile layout bug).
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
 
   const [messages, setMessages] = useState<Message[]>([
@@ -51,10 +44,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
     fetchDocuments();
   }, []);
 
-  // Closes the mobile overlay automatically after picking a tab, so the
-  // user doesn't have to separately dismiss the menu every time - desktop
-  // behavior (sidebar stays as-is) is untouched since this only matters
-  // when the sidebar is being used as an overlay.
   const selectTab = (tab: typeof activeTab) => {
     setActiveTab(tab);
     if (window.innerWidth < 768) {
@@ -64,22 +53,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
   const displayName = user?.name || user?.username || user?.email?.split('@')[0] || 'Student';
 
-  // Shared class string for every nav-label span - always mounted, animated
-  // via max-width + opacity instead of conditional mount/unmount, so text
-  // fades/collapses in sync with the sidebar's own width transition rather
-  // than popping in/out instantly and getting squeezed mid-animation, and
-  // so it no longer changes height and pushes the nav buttons up/down.
   const labelClass = (open: boolean) =>
     `truncate overflow-hidden whitespace-nowrap transition-all duration-300 ${
       open ? 'max-w-[160px] opacity-100' : 'max-w-0 opacity-0'
     }`;
 
+  const isChatTab = activeTab === 'chat' || activeTab === 'companion';
+
   return (
     <div className="h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300 overflow-hidden">
       <SecurityWarningBanner />
 
-      {/* Mobile-only backdrop - clicking it closes the overlay sidebar.
-          Invisible/inert on desktop (md:hidden). */}
       {isSidebarOpen && (
         <div
           onClick={() => setIsSidebarOpen(false)}
@@ -87,7 +71,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
         />
       )}
 
-      {/* Sidebar Navigation */}
       <aside
         className={`
           fixed md:sticky top-0 left-0 h-screen z-30 flex-shrink-0
@@ -107,27 +90,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               <Menu className="w-5 h-5" />
             </button>
 
-            {/* Always mounted now (was {isSidebarOpen && (...)}) - height
-                stays constant whether open or collapsed, so it no longer
-                pushes the nav buttons below it up/down when toggled. Width
-                and opacity still animate to fully hide it when collapsed,
-                keeping the logo's own layout/styling untouched. */}
             <div
               className={`flex items-center gap-2.5 overflow-hidden transition-all duration-300 ${
                 isSidebarOpen ? 'max-w-[200px] opacity-100 flex-1' : 'max-w-0 opacity-0'
               }`}
             >
-              {/* Logo Container: Acts as a square window to crop the wide image */}
               <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center">
                 <img
                   src="/Full Logo.png"
                   alt="StudyVault AI Logo"
-                  /* object-left pins the view to the first logo, scale-125 zooms past the whitespace borders */
                   className="w-full h-full object-cover object-left scale-125 origin-left"
                 />
               </div>
 
-              {/* Typography and Tagging */}
               <div className="min-w-0 flex-1">
                 <span className="font-bold text-[16px] tracking-tight truncate block text-slate-900 dark:text-slate-50">
                   StudyVault AI
@@ -138,9 +113,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               </div>
             </div>
 
-            {/* Close button - mobile overlay only. Width is constant on
-                mobile (only translate-x changes), so no squeeze issue here -
-                left as conditional mount/unmount. */}
             {isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(false)}
@@ -220,10 +192,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
         </button>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 w-full min-w-0 h-full p-4 sm:p-6 md:p-10 overflow-y-auto overflow-x-hidden transition-all duration-300">
-        <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 mb-6">
-          {/* Mobile menu button - only shown when the sidebar overlay is closed */}
+      <main className={`flex-1 w-full min-w-0 h-full flex flex-col p-4 sm:p-6 md:p-10 transition-all duration-300 ${isChatTab ? 'overflow-hidden' : 'overflow-x-hidden overflow-y-auto custom-scrollbar'}`}>
+        <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 mb-6 shrink-0">
           {!isSidebarOpen && (
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -248,7 +218,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           </div>
         </div>
 
-        <div key={activeTab} className="max-w-5xl mx-auto animate-fade-slide-in">
+        <div key={activeTab} className="flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col animate-fade-slide-in">
           {activeTab === 'home' && (
             <HomeOverview
               userName={displayName}

@@ -189,9 +189,10 @@ export const AICompanion: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-140px)]">
-      <div className="w-full md:w-64 md:shrink-0 max-h-56 md:max-h-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 space-y-2">
+    <div className="flex flex-col md:flex-row gap-4 h-full min-h-0">
+      
+      <div className="w-full md:w-64 md:shrink-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-xl flex flex-col min-h-[200px] md:min-h-0">
+        <div className="space-y-2 pb-4 mb-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
           <button
             onClick={handleNewConversation}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer"
@@ -208,7 +209,7 @@ export const AICompanion: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-1">
           {loadingConversations ? (
             <p className="text-xs text-slate-400 text-center py-4">Loading...</p>
           ) : conversations.length === 0 ? (
@@ -242,101 +243,112 @@ export const AICompanion: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-500" />
-            AI Companion
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Chat about anything - not limited to your documents. Ask me to remember things about you.
-          </p>
+      <div className="flex-1 min-h-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col transition-colors duration-300">
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                AI Companion
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Chat about anything - not limited to your documents. Ask me to remember things about you.
+              </p>
+            </div>
+          </div>
         </div>
 
         {justRemembered && (
-          <div className="mx-4 mt-3 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs flex items-center gap-2">
+          <div className="mb-4 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs flex items-center gap-2 shrink-0">
             <Brain className="w-3.5 h-3.5 shrink-0" />
             <span>I'll remember: {justRemembered}</span>
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 flex flex-col gap-4">
           {loadingMessages ? (
-            <p className="text-sm text-slate-400 text-center py-10">Loading conversation...</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <p className="text-sm text-slate-400">Loading conversation...</p>
+            </div>
           ) : !activeConversationId ? (
-            <div className="h-full flex flex-col items-center justify-center text-center gap-3 text-slate-400">
+            <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 text-slate-400">
               <MessageCircle className="w-10 h-10" />
               <p className="text-sm max-w-xs">
                 Start a new chat or pick one from the list to continue talking.
               </p>
             </div>
           ) : messages.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-10">
-              Say hello to get the conversation going.
-            </p>
-          ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
-                    msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'
-                  }`}
-                >
-                  {msg.sender === 'user' ? (
-                    <span className="whitespace-pre-wrap">{msg.content}</span>
-                  ) : (
-                    <div className="space-y-3">
-                      <ReactMarkdown
-                        components={{
-                          h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
-                          h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
-                          h3: ({ node, ...props }) => <h3 className="text-md font-bold mt-2 mb-1 text-indigo-600 dark:text-indigo-400" {...props} />,
-                          p: ({ node, ...props }) => <p className="leading-relaxed mb-2" {...props} />,
-                          ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-1 mb-2" {...props} />,
-                          ol: ({ node, ...props }) => <ol className="list-decimal pl-5 space-y-1 mb-2" {...props} />,
-                          li: ({ node, ...props }) => <li className="pl-1" {...props} />,
-                          strong: ({ node, ...props }) => <strong className="font-bold text-slate-900 dark:text-slate-100" {...props} />,
-                          code: ({ node, inline, ...props }: any) =>
-                            inline ? (
-                              <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[13px] text-pink-600 dark:text-pink-400" {...props} />
-                            ) : (
-                              <code className="block bg-slate-800 text-slate-50 p-3 rounded-lg text-[13px] overflow-x-auto my-2" {...props} />
-                            ),
-                        }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-          {isSending && (
-            <div className="flex justify-start">
-              <div className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-900 text-slate-400">
-                Thinking...
-              </div>
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <p className="text-sm text-slate-400">Say hello to get the conversation going.</p>
             </div>
+          ) : (
+            <>
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
+                      msg.sender === 'user'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'
+                    }`}
+                  >
+                    {msg.sender === 'user' ? (
+                      <span className="whitespace-pre-wrap">{msg.content}</span>
+                    ) : (
+                      <div className="space-y-3">
+                        <ReactMarkdown
+                          components={{
+                            h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+                            h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                            h3: ({ node, ...props }) => <h3 className="text-md font-bold mt-2 mb-1 text-indigo-600 dark:text-indigo-400" {...props} />,
+                            p: ({ node, ...props }) => <p className="leading-relaxed mb-2" {...props} />,
+                            ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-1 mb-2" {...props} />,
+                            ol: ({ node, ...props }) => <ol className="list-decimal pl-5 space-y-1 mb-2" {...props} />,
+                            li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                            strong: ({ node, ...props }) => <strong className="font-bold text-slate-900 dark:text-slate-100" {...props} />,
+                            code: ({ node, inline, ...props }: any) =>
+                              inline ? (
+                                <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[13px] text-pink-600 dark:text-pink-400" {...props} />
+                              ) : (
+                                <code className="block bg-slate-800 text-slate-50 p-3 rounded-lg text-[13px] overflow-x-auto my-2" {...props} />
+                              ),
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {isSending && (
+                <div className="flex justify-start">
+                  <div className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-900 text-slate-400">
+                    Thinking...
+                  </div>
+                </div>
+              )}
+            </>
           )}
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-0 shrink-0" />
         </div>
 
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-end gap-2">
+        <div className="flex gap-2 shrink-0">
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Message your AI Companion..."
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            className="flex-1 resize-none bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
             disabled={isSending || !inputValue.trim()}
-            className="p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl transition-colors cursor-pointer shrink-0"
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0"
             title="Send"
           >
             <Send className="w-4 h-4" />
@@ -347,7 +359,7 @@ export const AICompanion: React.FC = () => {
       {showMemoryPanel && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Brain className="w-4 h-4 text-indigo-500" />
                 What I remember about you
@@ -359,7 +371,7 @@ export const AICompanion: React.FC = () => {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-2">
               {memories.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-6">
                   Nothing saved yet. Tell me to remember something in a chat.

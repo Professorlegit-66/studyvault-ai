@@ -17,22 +17,12 @@ const AuthScreenContent: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // After a successful registration, we don't log the user in right away -
-  // the backend requires email verification first. 'authStep' controls
-  // whether we're showing the normal login/register form or the OTP entry
-  // screen; registeredEmail carries the address into the verify request.
   const [authStep, setAuthStep] = useState<'form' | 'verify'>('form');
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
 
-  // Sends a fresh OTP to targetEmail and switches to the verify screen.
-  // Takes the email as a parameter (rather than reading the registeredEmail
-  // state) so it can be called right after login/register discovers the
-  // email, without waiting on a state update to land first. Used both by
-  // the normal post-registration flow and by the "recover an interrupted
-  // registration" path below.
   const enterVerifyStep = async (targetEmail: string, { autoResend }: { autoResend: boolean }) => {
     setRegisteredEmail(targetEmail);
     setAuthStep('verify');
@@ -377,6 +367,29 @@ export const App: React.FC = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
+        {/* Global Scrollbar Styles for sleek, theme-aware webkit scrollbars */}
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 10px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+          }
+          .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+          }
+          .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+          }
+        `}</style>
         <AppContent />
       </AuthProvider>
     </ThemeProvider>
