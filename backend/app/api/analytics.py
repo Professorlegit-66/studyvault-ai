@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -25,7 +25,7 @@ async def get_analytics_summary(
         date_counts = {}
         total_review_logs = 0
 
-        # 2. Query ReviewLog table for accurate review activity count
+        # 2. Query ReviewLog table cleanly
         try:
             logs_stmt = select(ReviewLog).where(ReviewLog.user_id == current_user.id)
             logs = (await db.execute(logs_stmt)).scalars().all()
@@ -33,19 +33,17 @@ async def get_analytics_summary(
 
             for log in logs:
                 dt = log.reviewed_at
-                if dt is not None:
-                    # Normalize UTC timezone
+                if dt:
                     if dt.tzinfo is None:
                         dt = dt.replace(tzinfo=timezone.utc)
-                    
-                    # Format as ISO YYYY-MM-DD
+                    # Extract ISO date string YYYY-MM-DD
                     date_str = dt.strftime("%Y-%m-%d")
                     date_counts[date_str] = date_counts.get(date_str, 0) + 1
         except Exception as log_err:
             print(f"[Analytics] ReviewLog query error: {log_err}")
             await db.rollback()
 
-        # 3. Fallback to Flashcard last_reviewed_at if ReviewLog table is empty
+        # 3. Fallback count from Flashcard last_reviewed_at if logs table was empty
         if total_review_logs == 0:
             for card in cards:
                 if card.last_reviewed_at:
@@ -58,27 +56,27 @@ async def get_analytics_summary(
         heatmap = [{"date": d, "count": c} for d, c in date_counts.items()]
         total_actions = max(total_review_logs, sum(date_counts.values()))
 
-        # 4. Retention score calculation
+        # 4. Dynamic Real Retention Score Calculation
         if cards:
-            # Ease factor calculation (default base ease factor in SM-2 is 2.5)
+            total_cards = len(cards)
+            
+            # SM-2 Ease Factor Component (Standard baseline ease is 2.5)
             total_ease = sum(getattr(c, "ease_factor", 2.5) or 2.5 for c in cards)
-            avg_ease = total_ease / len(cards)
+            avg_ease = total_ease / total_cards
             ease_score = min(100.0, (avg_ease / 2.5) * 100)
 
-            # Count cards that have ever been reviewed or repeated
-            reviewed_count = sum(
+            # Active Recall Mastery Ratio
+            mastered_cards = sum(
                 1 for c in cards 
-                if (c.last_reviewed_at is not None or (getattr(c, "repetition_number", 0) or 0) > 0)
+                if (getattr(c, "interval_days", 1) or 1) >= 3 or (getattr(c, "repetition_number", 0) or 0) >= 2
             )
-            reviewed_ratio = (reviewed_count / len(cards)) * 100
+            mastery_ratio = (mastered_cards / total_cards) * 100
 
-            # Compute weighted retention score
-            if reviewed_count > 0 or total_actions > 0:
-                retention_score = round((0.7 * ease_score) + (0.3 * max(reviewed_ratio, 100.0 if total_actions > 0 else 0.0)))
-            else:
-                retention_score = 100 if len(cards) > 0 else 0
+            # Real Retention Formula: 60% Ease Factor + 40% Recall Mastery Ratio
+            calculated_retention = round((0.6 * ease_score) + (0.4 * mastery_ratio))
+            retention_score = min(100, max(15, calculated_retention))
         else:
-            retention_score = 100
+            retention_score = 0
 
         streak = (
             current_user.current_streak
@@ -87,7 +85,7 @@ async def get_analytics_summary(
         )
 
         return {
-            "retention_score": min(100, max(0, retention_score)),
+            "retention_score": retention_score,
             "current_streak": streak,
             "total_reviews": total_actions,
             "heatmap": heatmap,
@@ -95,7 +93,7 @@ async def get_analytics_summary(
     except Exception as e:
         print(f"Analytics summary error: {e}")
         return {
-            "retention_score": 100,
+            "retention_score": 0,
             "current_streak": 1,
             "total_reviews": 0,
             "heatmap": [],
