@@ -64,7 +64,25 @@ export const StudentMemory: React.FC = () => {
     downloadAnchor.remove();
   };
 
-  const topics = Array.from(new Set(flashcards.map(c => c.topic).filter(Boolean))) as string[];
+  // Map topics to their removed status.
+  // A topic is marked as removed ONLY if all its flashcards have a null document_id.
+  const topicStatusMap = new Map<string, boolean>();
+  flashcards.forEach(card => {
+    if (card.topic) {
+      const isNull = card.document_id == null;
+      if (!topicStatusMap.has(card.topic)) {
+        topicStatusMap.set(card.topic, isNull);
+      } else if (!isNull) {
+        // If we find at least one card with a valid document_id, it is not fully removed.
+        topicStatusMap.set(card.topic, false);
+      }
+    }
+  });
+
+  const topicOptions = Array.from(topicStatusMap.entries()).map(([topic, isRemoved]) => ({
+    value: topic,
+    label: isRemoved ? `${topic} (Removed)` : topic
+  }));
 
   const filteredCards = flashcards.filter(card => {
     const matchesSearch = 
@@ -128,7 +146,7 @@ export const StudentMemory: React.FC = () => {
             icon={<Filter className="w-4 h-4" />}
             options={[
               { value: 'all', label: `All Topics (${flashcards.length})` },
-              ...topics.map((topic) => ({ value: topic, label: topic })),
+              ...topicOptions,
             ]}
           />
         </div>
