@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logo from '../assets/studyvault-logo.png';
 import { apiClient } from '../api/client';
 import { HomeOverview } from '../components/HomeOverview';
 import { DocumentManager } from '../components/DocumentManager';
@@ -97,7 +98,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             >
               <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center">
                 <img
-                  src="/studyvault-logo.png"
+                  src={logo}
                   alt="StudyVault AI Logo"
                   className="w-full h-full object-cover object-left scale-125 origin-left"
                 />
