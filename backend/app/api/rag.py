@@ -19,6 +19,9 @@ router = APIRouter(prefix="/rag", tags=["rag"])
 
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
+# Similarity threshold to filter out noise
+MIN_SIMILARITY_THRESHOLD = 0.25
+
 class ChatQuery(BaseModel):
     query: str
     document_id: Optional[int] = None
@@ -51,7 +54,6 @@ async def chat_with_docs(
             .where(Document.user_id == current_user.id)
         )
 
-        # Handle multi-document ID filtering properly
         if request.document_ids:
             stmt = stmt.where(Document.id.in_(request.document_ids))
         elif request.document_id:
@@ -65,70 +67,73 @@ async def chat_with_docs(
                 sources=[]
             )
 
-        # 1. Embed query vector
+        # 1. Embed user query
         emb_res = client.models.embed_content(
             model="gemini-embedding-001",
             contents=request.query
         )
         query_vector = list(emb_res.embeddings[0].values)
 
-        # 2. Score similarity
+        # 2. Score similarity across chunks
         scored_chunks = []
         for chunk, doc in results:
             if chunk.embedding:
                 chunk_vector = list(chunk.embedding)
                 sim = cosine_similarity(query_vector, chunk_vector)
-                scored_chunks.append((sim, chunk.content, doc.title))
+                if sim >= MIN_SIMILARITY_THRESHOLD:
+                    scored_chunks.append((sim, chunk.content, doc.title, chunk.chunk_index))
 
         if not scored_chunks:
             return ChatResponse(
-                answer="No processable document embeddings found.",
+                answer="I couldn't find relevant details in your uploaded document(s) to answer this query.",
                 sources=[]
             )
 
+        # Sort descending by relevance score
         scored_chunks.sort(key=lambda x: x[0], reverse=True)
 
-        # Dynamic chunk scaling: Allocate ~2 chunks per selected document, capped between 4 and 10 total
+        # Dynamic chunk scaling: 2-4 chunks per selected doc, capped between 4 and 10
         selected_count = len(request.document_ids) if request.document_ids else 1
         target_chunk_limit = min(max(selected_count * 2, 4), 10)
 
-        # Multi-doc fairness enforcement: ensure every requested/retrieved document is represented
+        # Fair representation across selected documents
         top_chunks = []
         seen_docs = set()
         
-        # 1. Grab the highest scoring chunk for each unique document first
-        for sim, content, title in scored_chunks:
+        for item in scored_chunks:
+            sim, content, title, chunk_idx = item
             if title not in seen_docs and len(top_chunks) < target_chunk_limit:
-                top_chunks.append((sim, content, title))
+                top_chunks.append(item)
                 seen_docs.add(title)
 
-        # 2. Fill the remaining slots up to the target limit with the next highest scoring chunks overall
         for item in scored_chunks:
             if len(top_chunks) >= target_chunk_limit:
                 break
             if item not in top_chunks:
                 top_chunks.append(item)
 
-        # Filter out sources if low similarity score
-        sources = list(set([item[2] for item in top_chunks if item[0] > 0.02]))
+        sources = list(set([item[2] for item in top_chunks]))
 
-        # Format context with explicit file source tags for multi-document synthesis
-        context = "\n\n---\n\n".join([f"[Source: {item[2]}]\n{item[1]}" for item in top_chunks])
+        # Format context with document title and chunk index metadata
+        context_blocks = [
+            f"[Source: {item[2]} | Chunk #{item[3]}]\n{item[1]}"
+            for item in top_chunks
+        ]
+        context = "\n\n---\n\n".join(context_blocks)
 
-        # Conditional prompt tailoring for single vs multi-document mode
         is_multi_mode = request.document_ids is not None and len(request.document_ids) > 1
         multi_prompt_instruction = (
-            "4. Compare and contrast the provided sources. Explicitly note where the documents agree, where they complement each other, or if there are any contradictions between them."
+            "4. Compare and contrast the provided sources. Explicitly note where the documents agree, complement each other, or present contradictions."
             if is_multi_mode
             else ""
         )
 
-        prompt = f"""You are StudyVault AI, a helpful and direct AI tutor.
+        prompt = f"""You are StudyVault AI, a precise academic tutor assistant.
 
 Guidelines:
-1. For academic or subject-specific questions, DO NOT use greetings (e.g., "Hello") or state that you have accessed the vault. Start your response directly with the answer, or use a natural lead-in like "Based on the provided context..."
-2. Only confirm access to the vault if the user explicitly asks a meta-question like "Can you see my files?" or "Are you connected?"
-3. Answer strictly and accurately using the provided context below. When multiple sources are present, synthesize insights across them and cite relevant details.
+1. Start directly with the answer. Do NOT use greetings (e.g., "Hello") or state "Based on the provided context."
+2. Answer strictly using the provided Context from Vault below. If the information is not present, state clearly that it is missing from the document.
+3. Cite sources naturally using the document titles provided in the context blocks.
 {multi_prompt_instruction}
 
 Context from Vault:
@@ -137,12 +142,11 @@ Context from Vault:
 User Question: {request.query}
 """
 
-        # Generate response disabling function calling to eliminate log warnings
         gen_res = client.models.generate_content(
             model="gemini-3.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
-                temperature=0.3,
+                temperature=0.2,
             )
         )
 
@@ -152,12 +156,12 @@ User Question: {request.query}
         if e.code == 503:
             raise HTTPException(
                 status_code=503, 
-                detail="The AI provider is currently experiencing high demand. Please try again in a few moments."
+                detail="The AI provider is currently experiencing high demand. Please try again shortly."
             )
         elif e.code == 429:
             print(f"[RAG Chat] Gemini rate limit hit: {e.message}")
             return ChatResponse(
-                answer="I've hit my usage limit for the moment and can't respond right now. Please try again in a little while.",
+                answer="I've hit my usage limit for the moment. Please try again in a little while.",
                 sources=[]
             )
         else:
