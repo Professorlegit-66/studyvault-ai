@@ -219,26 +219,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           </div>
         </div>
 
-        <div key={activeTab} className="flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col animate-fade-slide-in">
-          {activeTab === 'home' && (
+        <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col">
+          <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'home' ? 'flex' : 'hidden'}`}>
             <HomeOverview
               userName={displayName}
               documentCount={documents.length}
               onNavigate={(tab) => setActiveTab(tab as any)}
             />
-          )}
+          </div>
 
-          {activeTab === 'documents' && (
+          <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'documents' ? 'flex' : 'hidden'}`}>
             <DocumentManager documents={documents} onDocumentsChange={fetchDocuments} />
-          )}
+          </div>
 
-          {activeTab === 'chat' && (
+          <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'chat' ? 'flex' : 'hidden'}`}>
             <AITutorChat documents={documents} messages={messages} setMessages={setMessages} />
-          )}
+          </div>
 
-          {activeTab === 'companion' && <AICompanion />}
+          <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'companion' ? 'flex' : 'hidden'}`}>
+            <AICompanion />
+          </div>
 
-          {activeTab === 'memory' && <StudentMemory />}
+          <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'memory' ? 'flex' : 'hidden'}`}>
+            <StudentMemory />
+          </div>
         </div>
       </main>
     </div>

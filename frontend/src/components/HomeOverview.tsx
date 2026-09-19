@@ -31,37 +31,38 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
 
   const availableYears = [2026, 2025];
 
-  useEffect(() => {
-    const fetchOverviewData = async () => {
-      try {
-        const [docsRes, memoryRes, analyticsRes] = await Promise.all([
-          apiClient.get('/documents'),
-          apiClient.get('/memory/due'),
-          apiClient.get('/analytics/summary')
-        ]);
-        if (Array.isArray(docsRes.data)) {
-          setRecentDocs(docsRes.data.slice(0, 5));
+  const fetchOverviewData = async () => {
+    try {
+      const [docsRes, memoryRes, analyticsRes] = await Promise.all([
+        apiClient.get('/documents'),
+        apiClient.get('/memory/due'),
+        apiClient.get('/analytics/summary')
+      ]);
+      if (Array.isArray(docsRes.data)) {
+        setRecentDocs(docsRes.data.slice(0, 5));
+      }
+      if (Array.isArray(memoryRes.data)) {
+        setCardCount(memoryRes.data.length);
+      }
+      if (analyticsRes.data) {
+        if (typeof analyticsRes.data.retention_score === 'number') {
+          setMasteryPercent(analyticsRes.data.retention_score);
         }
-        if (Array.isArray(memoryRes.data)) {
-          setCardCount(memoryRes.data.length);
+        if (typeof analyticsRes.data.current_streak === 'number') {
+          setStreakDays(analyticsRes.data.current_streak);
         }
-        if (analyticsRes.data) {
-          if (typeof analyticsRes.data.retention_score === 'number') {
-            setMasteryPercent(analyticsRes.data.retention_score);
-          }
-          if (typeof analyticsRes.data.current_streak === 'number') {
-            setStreakDays(analyticsRes.data.current_streak);
-          }
-          const realHeatmap = Array.isArray(analyticsRes.data.heatmap) ? analyticsRes.data.heatmap : [];
-          buildYearHeatmap(selectedYear, realHeatmap);
-        } else {
-          buildYearHeatmap(selectedYear, []);
-        }
-      } catch (err) {
-        console.error('Failed to load overview data', err);
+        const realHeatmap = Array.isArray(analyticsRes.data.heatmap) ? analyticsRes.data.heatmap : [];
+        buildYearHeatmap(selectedYear, realHeatmap);
+      } else {
         buildYearHeatmap(selectedYear, []);
       }
-    };
+    } catch (err) {
+      console.error('Failed to load overview data', err);
+      buildYearHeatmap(selectedYear, []);
+    }
+  };
+
+  useEffect(() => {
     fetchOverviewData();
   }, [selectedYear]);
 
@@ -77,14 +78,11 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
     setTotalContributions(yearTotal);
 
     const days: HeatmapDay[] = [];
-    
-    // Start from Jan 1 and align back to the nearest Monday
     const startDate = new Date(year, 0, 1);
     const startDay = startDate.getDay();
     const diffToMon = startDay === 0 ? -6 : 1 - startDay;
     startDate.setDate(startDate.getDate() + diffToMon);
 
-    // End strictly on Dec 31 for past years, or today for current year
     const isCurrentYear = year === new Date().getFullYear();
     const endDate = isCurrentYear ? new Date() : new Date(year, 11, 31);
 
@@ -200,7 +198,7 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
         </button>
       </div>
 
-      {/* Perfectly Scaled Heatmap */}
+      {/* Heatmap Section */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-xl space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100 dark:border-slate-700/50">
           <div>
@@ -229,7 +227,6 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
 
         <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 overflow-x-auto custom-scrollbar">
           <div className="flex flex-col gap-1.5 py-1 w-fit">
-            {/* Month labels row */}
             <div className="flex text-[10px] text-slate-400 dark:text-slate-500 font-medium pl-7 relative h-3.5">
               {monthLabels.map((m, idx) => (
                 <span
@@ -243,14 +240,12 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
             </div>
 
             <div className="flex gap-2">
-              {/* Weekday labels column */}
               <div className="flex flex-col justify-between text-[10px] text-slate-400 dark:text-slate-500 font-medium pr-1 py-0.5 h-[102px]">
                 <span>Mon</span>
                 <span>Wed</span>
                 <span>Fri</span>
               </div>
 
-              {/* Heatmap grid */}
               <div className="flex gap-1">
                 {weeks.map((week, weekIdx) => (
                   <div key={weekIdx} className="flex flex-col gap-1">
@@ -294,22 +289,8 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
             {recentDocs.map((doc) => (
               <div key={doc.id} className="py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-500/10 text-indigo-500 rounded-lg">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Added {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Recently'}
-                    </p>
-                  </div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</p>
                 </div>
-                <button
-                  onClick={() => onNavigate('documents')}
-                  className="text-xs font-semibold text-indigo-500 hover:underline cursor-pointer"
-                >
-                  View Vault
-                </button>
               </div>
             ))}
           </div>

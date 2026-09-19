@@ -73,10 +73,11 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fetchingHistory, setFetchingHistory] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const previousDocKeyRef = useRef<string>('');
+  const initializedRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -84,25 +85,16 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loading]);
+  }, [messages, loading, fetchingHistory]);
 
-  // Load chat history only when document selection actually changes
+  // Load global chat history exactly once on mount
   const loadChatHistory = useCallback(async () => {
-    const activeDocId =
-      ragMode === 'single' && selectedIds.length > 0 ? selectedIds[0] : null;
-    const currentDocKey = activeDocId ? `doc_${activeDocId}` : 'global';
-
-    // Avoid refetching if selection target hasn't changed
-    if (previousDocKeyRef.current === currentDocKey && messages.length > 0) {
-      return;
-    }
-    previousDocKeyRef.current = currentDocKey;
+    if (initializedRef.current || messages.length > 0) return;
+    initializedRef.current = true;
+    setFetchingHistory(true);
 
     try {
-      const url = activeDocId
-        ? `/rag/history?document_id=${activeDocId}`
-        : `/rag/history`;
-      const res = await apiClient.get<Message[]>(url);
+      const res = await apiClient.get<Message[]>('/rag/history');
       if (Array.isArray(res.data) && res.data.length > 0) {
         setMessages(res.data);
       } else {
@@ -111,8 +103,10 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     } catch (err) {
       console.error('Failed to load chat history:', err);
       setMessages([DEFAULT_GREETING]);
+    } finally {
+      setFetchingHistory(false);
     }
-  }, [ragMode, selectedIds, messages.length, setMessages]);
+  }, [messages.length, setMessages]);
 
   useEffect(() => {
     loadChatHistory();
@@ -158,12 +152,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
 
   const handleClearHistory = async () => {
     try {
-      const activeDocId =
-        ragMode === 'single' && selectedIds.length > 0 ? selectedIds[0] : null;
-      const url = activeDocId
-        ? `/rag/history?document_id=${activeDocId}`
-        : `/rag/history`;
-      await apiClient.delete(url);
+      await apiClient.delete('/rag/history');
       setMessages([DEFAULT_GREETING]);
     } catch (err) {
       console.error('Failed to clear chat history:', err);
@@ -171,7 +160,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
   };
 
   const getDropdownLabel = useMemo(() => {
-    if (selectedIds.length === 0) return 'Select Document...';
+    if (selectedIds.length === 0) return 'Select Document Context...';
     if (selectedIds.length === 1) {
       const doc = documents.find((d) => String(d.id) === selectedIds[0]);
       return doc ? doc.title : '1 Document Selected';
@@ -262,7 +251,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {messages.length > 1 && (
+          {messages.length > 1 && !fetchingHistory && (
             <button
               onClick={handleClearHistory}
               type="button"
@@ -377,48 +366,58 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 flex flex-col gap-4">
-        {messages.map((msg, idx) => (
-          <div
-            key={msg.id ?? `msg-${idx}`}
-            className={`flex gap-3 ${
-              msg.sender === 'user' ? 'justify-end' : 'justify-start'
-            }`}
-          >
-            {msg.sender === 'ai' && (
-              <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit">
-                <Bot className="w-4 h-4" />
-              </div>
-            )}
+        {fetchingHistory ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="flex flex-col items-center gap-3 text-slate-400">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+              <span className="text-xs font-medium">Restoring conversation...</span>
+            </div>
+          </div>
+        ) : (
+          messages.map((msg, idx) => (
             <div
-              className={`max-w-[80%] p-3.5 rounded-2xl text-sm ${
-                msg.sender === 'user'
-                  ? 'bg-indigo-600 text-white rounded-br-none'
-                  : 'bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 rounded-bl-none'
+              key={msg.id ?? `msg-${idx}`}
+              className={`flex gap-3 ${
+                msg.sender === 'user' ? 'justify-end' : 'justify-start'
               }`}
             >
-              {msg.sender === 'user' ? (
-                <span className="whitespace-pre-wrap">{msg.text}</span>
-              ) : (
-                <div className="space-y-2 leading-relaxed">
-                  <ReactMarkdown components={MARKDOWN_COMPONENTS}>
-                    {msg.text}
-                  </ReactMarkdown>
+              {msg.sender === 'ai' && (
+                <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit">
+                  <Bot className="w-4 h-4" />
                 </div>
               )}
-              {msg.sources && msg.sources.length > 0 && (
-                <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                  <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span>Sources: {msg.sources.join(', ')}</span>
+              <div
+                className={`max-w-[80%] p-3.5 rounded-2xl text-sm ${
+                  msg.sender === 'user'
+                    ? 'bg-indigo-600 text-white rounded-br-none'
+                    : 'bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 rounded-bl-none'
+                }`}
+              >
+                {msg.sender === 'user' ? (
+                  <span className="whitespace-pre-wrap">{msg.text}</span>
+                ) : (
+                  <div className="space-y-2 leading-relaxed">
+                    <ReactMarkdown components={MARKDOWN_COMPONENTS}>
+                      {msg.text}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Sources: {msg.sources.join(', ')}</span>
+                  </div>
+                )}
+              </div>
+              {msg.sender === 'user' && (
+                <div className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg h-fit">
+                  <User className="w-4 h-4" />
                 </div>
               )}
             </div>
-            {msg.sender === 'user' && (
-              <div className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg h-fit">
-                <User className="w-4 h-4" />
-              </div>
-            )}
-          </div>
-        ))}
+          ))
+        )}
+
         {loading && (
           <div className="flex gap-3 justify-start items-center text-slate-500 dark:text-slate-400 text-xs">
             <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
@@ -439,12 +438,12 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a question about your study materials..."
-          disabled={loading}
+          disabled={loading || fetchingHistory}
           className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
         />
         <button
           type="submit"
-          disabled={loading || !input.trim()}
+          disabled={loading || !input.trim() || fetchingHistory}
           className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center disabled:opacity-50 cursor-pointer"
         >
           <Send className="w-4 h-4" />
