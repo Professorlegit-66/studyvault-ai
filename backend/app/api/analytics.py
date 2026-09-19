@@ -15,14 +15,28 @@ async def get_analytics_summary(
     db: AsyncSession = Depends(get_db),
 ):
     try:
+        # Strictly fetch flashcards belonging to the logged-in user
         stmt = select(Flashcard).where(Flashcard.user_id == current_user.id)
         cards = (await db.execute(stmt)).scalars().all()
 
+        if not cards:
+            return {
+                "retention_score": 0,
+                "current_streak": current_user.current_streak or 1,
+                "total_reviews": 0,
+                "heatmap": []
+            }
+
         date_counts = {}
         total_reviews = 0
+        total_ease = 0.0
+        reviewed_cards_count = 0
 
         for card in cards:
+            total_ease += card.ease_factor
+            
             if card.last_reviewed_at:
+                reviewed_cards_count += 1
                 dt = card.last_reviewed_at
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
@@ -34,11 +48,20 @@ async def get_analytics_summary(
 
         heatmap = [{"date": d, "count": c} for d, c in date_counts.items()]
 
-        # Read streak from user model, ensuring at least 1 for active sessions
+        # Dynamic user-specific retention calculation
+        avg_ease = total_ease / len(cards)
+        ease_score = min(100.0, (avg_ease / 2.5) * 100)
+        reviewed_ratio = (reviewed_cards_count / len(cards)) * 100
+
+        if reviewed_cards_count > 0:
+            user_retention = round((0.7 * ease_score) + (0.3 * reviewed_ratio))
+        else:
+            user_retention = 0
+
         streak = current_user.current_streak if (current_user.current_streak and current_user.current_streak > 0) else 1
 
         return {
-            "retention_score": 92 if cards else 0,
+            "retention_score": min(100, max(0, user_retention)),
             "current_streak": streak,
             "total_reviews": total_reviews,
             "heatmap": heatmap
