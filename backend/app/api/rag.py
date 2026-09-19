@@ -118,7 +118,7 @@ async def chat_with_docs(
         # Conditional prompt tailoring for single vs multi-document mode
         is_multi_mode = request.document_ids is not None and len(request.document_ids) > 1
         multi_prompt_instruction = (
-            "4. Compare and contrast the provided sources. Explicitly note where the documents agree, complement each other, or highlight differences."
+            "4. Compare and contrast the provided sources. Explicitly note where the documents agree, where they complement each other, or if there are any contradictions between them."
             if is_multi_mode
             else ""
         )

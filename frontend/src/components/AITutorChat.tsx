@@ -24,7 +24,8 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const [ragMode, setRagMode] = useState<'single' | 'multi'>('single');
-  const [selectedIds, setSelectedIds] = useState<string[]>(['all']);
+  // Initialize to empty or single default instead of auto-selecting 'all'
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -50,46 +51,42 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
 
   const handleModeSwitch = (mode: 'single' | 'multi') => {
     setRagMode(mode);
-    if (mode === 'single') {
-      // If switching to single mode, keep only the first selected doc, or default to 'all'
-      if (selectedIds.length > 1 && !selectedIds.includes('all')) {
-        setSelectedIds([selectedIds[0]]);
-      }
-    }
+    // Reset selection when switching modes so the user makes a deliberate choice
+    setSelectedIds([]);
   };
 
   const handleToggleDoc = (id: string) => {
     if (ragMode === 'single') {
-      // In single mode, clicking any document replaces selection and closes dropdown
       setSelectedIds([id]);
       setIsDropdownOpen(false);
       return;
     }
 
-    // Multi mode logic
-    if (id === 'all') {
-      setSelectedIds(['all']);
-      return;
-    }
-
+    // Multi mode toggle logic
     setSelectedIds((prev) => {
-      const withoutAll = prev.filter((item) => item !== 'all');
-      if (withoutAll.includes(id)) {
-        const next = withoutAll.filter((item) => item !== id);
-        return next.length === 0 ? ['all'] : next;
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
       } else {
-        return [...withoutAll, id];
+        return [...prev, id];
       }
     });
   };
 
+  const handleSelectAll = () => {
+    if (documents.length === 0) return;
+    setSelectedIds(documents.map((d) => String(d.id)));
+  };
+
   const getDropdownLabel = () => {
-    if (selectedIds.includes('all') || selectedIds.length === 0) {
-      return ragMode === 'single' ? 'Select Document...' : 'All Vault Documents';
+    if (selectedIds.length === 0) {
+      return 'Select Document...';
     }
     if (selectedIds.length === 1) {
       const doc = documents.find((d) => String(d.id) === selectedIds[0]);
       return doc ? doc.title : '1 Document Selected';
+    }
+    if (documents.length > 0 && selectedIds.length === documents.length) {
+      return 'All Vault Documents';
     }
     return `${selectedIds.length} Documents Selected`;
   };
@@ -107,12 +104,11 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       const payload: { query: string; document_id?: number; document_ids?: number[] } = { query: userQuery };
       
       if (ragMode === 'single') {
-        if (selectedIds.length > 0 && selectedIds[0] !== 'all') {
+        if (selectedIds.length > 0) {
           payload.document_id = Number(selectedIds[0]);
         }
       } else {
-        // Filter out 'all' and convert to numbers properly
-        const activeIds = selectedIds.filter((id) => id !== 'all').map((id) => Number(id));
+        const activeIds = selectedIds.map((id) => Number(id));
         if (activeIds.length > 0) {
           payload.document_ids = activeIds;
         }
@@ -144,6 +140,8 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       setLoading(false);
     }
   };
+
+  const isAllSelected = documents.length > 0 && selectedIds.length === documents.length;
 
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col h-[calc(100vh-8rem)] transition-colors duration-300">
@@ -209,20 +207,26 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
             {isDropdownOpen && (
               <div className="absolute right-0 mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto p-1.5 space-y-1">
                 {ragMode === 'multi' && (
-                  <>
-                    <div
-                      onClick={() => handleToggleDoc('all')}
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                        selectedIds.includes('all')
-                          ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400'
-                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-200 dark:border-slate-800 pb-2 mb-1 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      className={`flex-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer text-center ${
+                        isAllSelected
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
-                      <span>All Vault Documents</span>
-                      {selectedIds.includes('all') && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
-                    </div>
-                    <div className="border-t border-slate-200 dark:border-slate-800 my-1" />
-                  </>
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIds([])}
+                      className="flex-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer text-center bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-900/50"
+                    >
+                      Clear
+                    </button>
+                  </div>
                 )}
 
                 {documents.length === 0 ? (
