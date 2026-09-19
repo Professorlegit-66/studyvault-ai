@@ -88,19 +88,23 @@ async def chat_with_docs(
 
         scored_chunks.sort(key=lambda x: x[0], reverse=True)
 
+        # Dynamic chunk scaling: Allocate ~2 chunks per selected document, capped between 4 and 10 total
+        selected_count = len(request.document_ids) if request.document_ids else 1
+        target_chunk_limit = min(max(selected_count * 2, 4), 10)
+
         # Multi-doc fairness enforcement: ensure every requested/retrieved document is represented
         top_chunks = []
         seen_docs = set()
         
         # 1. Grab the highest scoring chunk for each unique document first
         for sim, content, title in scored_chunks:
-            if title not in seen_docs and len(top_chunks) < 4:
+            if title not in seen_docs and len(top_chunks) < target_chunk_limit:
                 top_chunks.append((sim, content, title))
                 seen_docs.add(title)
 
-        # 2. Fill the remaining slots up to 4 with the next highest scoring chunks overall
+        # 2. Fill the remaining slots up to the target limit with the next highest scoring chunks overall
         for item in scored_chunks:
-            if len(top_chunks) >= 4:
+            if len(top_chunks) >= target_chunk_limit:
                 break
             if item not in top_chunks:
                 top_chunks.append(item)
@@ -111,12 +115,21 @@ async def chat_with_docs(
         # Format context with explicit file source tags for multi-document synthesis
         context = "\n\n---\n\n".join([f"[Source: {item[2]}]\n{item[1]}" for item in top_chunks])
 
+        # Conditional prompt tailoring for single vs multi-document mode
+        is_multi_mode = request.document_ids is not None and len(request.document_ids) > 1
+        multi_prompt_instruction = (
+            "4. Compare and contrast the provided sources. Explicitly note where the documents agree, complement each other, or highlight differences."
+            if is_multi_mode
+            else ""
+        )
+
         prompt = f"""You are StudyVault AI, a helpful and direct AI tutor.
 
 Guidelines:
 1. For academic or subject-specific questions, DO NOT use greetings (e.g., "Hello") or state that you have accessed the vault. Start your response directly with the answer, or use a natural lead-in like "Based on the provided context..."
 2. Only confirm access to the vault if the user explicitly asks a meta-question like "Can you see my files?" or "Are you connected?"
 3. Answer strictly and accurately using the provided context below. When multiple sources are present, synthesize insights across them and cite relevant details.
+{multi_prompt_instruction}
 
 Context from Vault:
 {context}
