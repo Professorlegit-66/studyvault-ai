@@ -97,7 +97,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
             >
               <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center">
                 <img
-                  src="/Full Logo.png"
+                  src="/studyvault-logo.png"
                   alt="StudyVault AI Logo"
                   className="w-full h-full object-cover object-left scale-125 origin-left"
                 />
