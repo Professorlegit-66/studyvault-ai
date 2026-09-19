@@ -64,6 +64,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
   const displayName = user?.name || user?.username || user?.email?.split('@')[0] || 'Student';
 
+  // Shared class string for every nav-label span - always mounted, animated
+  // via max-width + opacity instead of conditional mount/unmount, so text
+  // fades/collapses in sync with the sidebar's own width transition rather
+  // than popping in/out instantly and getting squeezed mid-animation, and
+  // so it no longer changes height and pushes the nav buttons up/down.
+  const labelClass = (open: boolean) =>
+    `truncate overflow-hidden whitespace-nowrap transition-all duration-300 ${
+      open ? 'max-w-[160px] opacity-100' : 'max-w-0 opacity-0'
+    }`;
+
   return (
     <div className="h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors duration-300 overflow-hidden">
       <SecurityWarningBanner />
@@ -97,31 +107,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               <Menu className="w-5 h-5" />
             </button>
 
-            {isSidebarOpen && (
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                {/* Logo Container: Acts as a square window to crop the wide image */}
-                <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center">
-                  <img 
-                    src="/Full Logo.png" 
-                    alt="StudyVault AI Logo" 
-                    /* object-left pins the view to the first logo, scale-125 zooms past the whitespace borders */
-                    className="w-full h-full object-cover object-left scale-125 origin-left" 
-                  />
-                </div>
-                
-                {/* Typography and Tagging */}
-                <div className="min-w-0 flex-1">
-                  <span className="font-bold text-[16px] tracking-tight truncate block text-slate-900 dark:text-slate-50">
-                    StudyVault AI
-                  </span>
-                  <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md leading-none">
-                    Beta
-                  </span>
-                </div>
+            {/* Always mounted now (was {isSidebarOpen && (...)}) - height
+                stays constant whether open or collapsed, so it no longer
+                pushes the nav buttons below it up/down when toggled. Width
+                and opacity still animate to fully hide it when collapsed,
+                keeping the logo's own layout/styling untouched. */}
+            <div
+              className={`flex items-center gap-2.5 overflow-hidden transition-all duration-300 ${
+                isSidebarOpen ? 'max-w-[200px] opacity-100 flex-1' : 'max-w-0 opacity-0'
+              }`}
+            >
+              {/* Logo Container: Acts as a square window to crop the wide image */}
+              <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center">
+                <img
+                  src="/Full Logo.png"
+                  alt="StudyVault AI Logo"
+                  /* object-left pins the view to the first logo, scale-125 zooms past the whitespace borders */
+                  className="w-full h-full object-cover object-left scale-125 origin-left"
+                />
               </div>
-            )}
 
-            {/* Close button - mobile overlay only */}
+              {/* Typography and Tagging */}
+              <div className="min-w-0 flex-1">
+                <span className="font-bold text-[16px] tracking-tight truncate block text-slate-900 dark:text-slate-50">
+                  StudyVault AI
+                </span>
+                <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md leading-none">
+                  Beta
+                </span>
+              </div>
+            </div>
+
+            {/* Close button - mobile overlay only. Width is constant on
+                mobile (only translate-x changes), so no squeeze issue here -
+                left as conditional mount/unmount. */}
             {isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(false)}
@@ -142,7 +161,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               title="Overview"
             >
               <LayoutDashboard className="w-4 h-4 shrink-0" />
-              {isSidebarOpen && <span className="truncate">Overview</span>}
+              <span className={labelClass(isSidebarOpen)}>Overview</span>
             </button>
 
             <button
@@ -153,7 +172,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               title="Documents Vault"
             >
               <FileText className="w-4 h-4 shrink-0" />
-              {isSidebarOpen && <span className="truncate">Documents Vault</span>}
+              <span className={labelClass(isSidebarOpen)}>Documents Vault</span>
             </button>
 
             <button
@@ -164,7 +183,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               title="AI Tutor Chat"
             >
               <MessageSquare className="w-4 h-4 shrink-0" />
-              {isSidebarOpen && <span className="truncate">AI Tutor Chat</span>}
+              <span className={labelClass(isSidebarOpen)}>AI Tutor Chat</span>
             </button>
 
             <button
@@ -175,7 +194,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
                 title="AI Companion"
             >
               <Sparkles className="w-4 h-4 shrink-0" />
-              {isSidebarOpen && <span className="truncate">AI Companion</span>}
+              <span className={labelClass(isSidebarOpen)}>AI Companion</span>
             </button>
 
             <button
@@ -186,7 +205,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
               title="Student Memory"
             >
               <Brain className="w-4 h-4 shrink-0" />
-              {isSidebarOpen && <span className="truncate">Student Memory</span>}
+              <span className={labelClass(isSidebarOpen)}>Student Memory</span>
             </button>
           </nav>
         </div>
@@ -197,7 +216,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           title="Sign Out"
         >
           <LogOut className="w-4 h-4 shrink-0" />
-          {isSidebarOpen && <span className="truncate">Sign Out</span>}
+          <span className={labelClass(isSidebarOpen)}>Sign Out</span>
         </button>
       </aside>
 
