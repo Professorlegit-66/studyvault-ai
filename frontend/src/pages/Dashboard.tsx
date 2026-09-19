@@ -155,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           <nav className={`space-y-1.5 w-full overflow-hidden ${!isSidebarOpen ? 'md:flex md:flex-col md:items-center' : ''}`}>
             <button
               onClick={() => selectTab('home')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+              className={`w-full flex items-center ${isSidebarOpen ? 'gap-3' : 'gap-0'} px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'home' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
               } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
               title="Overview"
@@ -166,7 +166,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
             <button
               onClick={() => selectTab('documents')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+              className={`w-full flex items-center ${isSidebarOpen ? 'gap-3' : 'gap-0'} px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'documents' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
               } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
               title="Documents Vault"
@@ -177,7 +177,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
             <button
               onClick={() => selectTab('chat')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+              className={`w-full flex items-center ${isSidebarOpen ? 'gap-3' : 'gap-0'} px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'chat' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
               } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
               title="AI Tutor Chat"
@@ -188,7 +188,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
             <button
               onClick={() => selectTab('companion')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+              className={`w-full flex items-center ${isSidebarOpen ? 'gap-3' : 'gap-0'} px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'companion' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
                 } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
                 title="AI Companion"
@@ -199,7 +199,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
             <button
               onClick={() => selectTab('memory')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
+              className={`w-full flex items-center ${isSidebarOpen ? 'gap-3' : 'gap-0'} px-4 py-3 rounded-xl font-medium text-sm transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${
                 activeTab === 'memory' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-900'
               } ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
               title="Student Memory"
@@ -212,7 +212,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
         <button
           onClick={logout}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-rose-500 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
+          className={`w-full flex items-center ${isSidebarOpen ? 'gap-3' : 'gap-0'} px-4 py-3 rounded-xl font-medium text-sm text-rose-500 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer overflow-hidden whitespace-nowrap ${!isSidebarOpen ? 'md:justify-center md:px-0' : ''}`}
           title="Sign Out"
         >
           <LogOut className="w-4 h-4 shrink-0" />
