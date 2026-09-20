@@ -25,11 +25,16 @@ const formatFileSize = (bytes?: number): string => {
 };
 
 interface DocumentManagerProps {
+  isActive?: boolean;
   documents: Document[];
   onDocumentsChange: () => void;
 }
 
-export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onDocumentsChange }) => {
+export const DocumentManager: React.FC<DocumentManagerProps> = ({ 
+  isActive = true, 
+  documents, 
+  onDocumentsChange 
+}) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generatingId, setGeneratingId] = useState<number | null>(null);
@@ -47,21 +52,11 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
     if (!files || files.length === 0) return;
     const file = files[0];
 
-    // Reset the input immediately - otherwise selecting the exact same
-    // file again later (e.g. right after resolving a duplicate-name
-    // conflict) won't fire onChange, since browsers don't re-trigger a
-    // change event for an unchanged file selection.
     e.target.value = '';
 
     setUploadError(null);
     setSuccessMsg(null);
 
-    // Instant client-side check against documents already loaded this
-    // session - a courtesy for immediate feedback with no round trip. This
-    // is NOT the authoritative check; see the matching check in
-    // documents.py, which is what actually prevents a duplicate even when
-    // this local list is stale (e.g. mid-race with an in-flight upload of
-    // the same file that the frontend already gave up waiting on).
     const isDuplicate = documents.some(
       (doc) => doc.title.toLowerCase() === file.name.toLowerCase()
     );
@@ -77,16 +72,6 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onD
     try {
       await apiClient.post('/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        // Document upload can take far longer than a typical request -
-        // parsing plus one embedding API call per chunk, sequentially,
-        // possibly against a cold-starting backend. The global 45s
-        // timeout (set for quick requests like the initial session check)
-        // was too short here, and previously caused the frontend to
-        // report a false "failed" while the upload kept running and
-        // completed anyway server-side - which is what caused documents
-        // to appear to upload twice when a user retried after seeing that
-        // false failure. Disabling the timeout for this specific request
-        // (0 = no timeout in axios) fixes that at the source.
         timeout: 0,
       });
       onDocumentsChange();

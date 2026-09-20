@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { Brain, FileText, ArrowRight, Flame, Activity, Clock, Calendar as CalendarIcon } from 'lucide-react';
 
 interface HomeOverviewProps {
+  isActive: boolean;
   userName: string;
   documentCount: number;
   onNavigate: (tab: 'home' | 'documents' | 'memory' | 'chat' | 'companion') => void;
@@ -20,7 +21,7 @@ interface HeatmapDay {
   count: number;
 }
 
-export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCount, onNavigate }) => {
+export const HomeOverview: React.FC<HomeOverviewProps> = ({ isActive, userName, documentCount, onNavigate }) => {
   const [recentDocs, setRecentDocs] = useState<ActivityItem[]>([]);
   const [cardCount, setCardCount] = useState(0);
   const [masteryPercent, setMasteryPercent] = useState<number | null>(null);
@@ -64,8 +65,10 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
   };
 
   useEffect(() => {
-    fetchOverviewData();
-  }, [selectedYear]);
+    if (isActive) {
+      fetchOverviewData();
+    }
+  }, [isActive, selectedYear]);
 
   const buildYearHeatmap = (year: number, realData: HeatmapDay[]) => {
     const daysMap = new Map<string, number>();

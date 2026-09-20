@@ -25,6 +25,7 @@ export interface Message {
 }
 
 interface AITutorChatProps {
+  isActive?: boolean;
   documents: Document[];
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -64,6 +65,7 @@ const MARKDOWN_COMPONENTS = {
 };
 
 export const AITutorChat: React.FC<AITutorChatProps> = ({
+  isActive = true,
   documents,
   messages,
   setMessages,
@@ -87,7 +89,6 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     scrollToBottom();
   }, [messages, loading, fetchingHistory]);
 
-  // Load global chat history exactly once on mount
   const loadChatHistory = useCallback(async () => {
     if (initializedRef.current || messages.length > 0) return;
     initializedRef.current = true;

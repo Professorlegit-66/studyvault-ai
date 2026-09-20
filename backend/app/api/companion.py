@@ -62,7 +62,10 @@ async def list_conversations(
 ):
     stmt = (
         select(Conversation)
-        .where(Conversation.user_id == current_user.id)
+        .where(
+            Conversation.user_id == current_user.id,
+            Conversation.title.not_like("rag_%")  # Exclude AI Tutor conversations
+        )
         .order_by(desc(Conversation.created_at))
     )
     result = await db.execute(stmt)
@@ -88,6 +91,7 @@ async def delete_conversation(
     stmt = select(Conversation).where(
         Conversation.id == conversation_id,
         Conversation.user_id == current_user.id,
+        Conversation.title.not_like("rag_%")  # Prevent deleting RAG chats from Companion API
     )
     convo = (await db.execute(stmt)).scalar_one_or_none()
     if not convo:
@@ -106,6 +110,7 @@ async def get_conversation_messages(
     convo_stmt = select(Conversation).where(
         Conversation.id == conversation_id,
         Conversation.user_id == current_user.id,
+        Conversation.title.not_like("rag_%")  # Prevent viewing RAG chats from Companion API
     )
     convo = (await db.execute(convo_stmt)).scalar_one_or_none()
     if not convo:
@@ -185,6 +190,7 @@ async def chat_with_companion(
     convo_stmt = select(Conversation).where(
         Conversation.id == conversation_id,
         Conversation.user_id == current_user.id,
+        Conversation.title.not_like("rag_%")  # Prevent chatting in RAG chats from Companion API
     )
     convo = (await db.execute(convo_stmt)).scalar_one_or_none()
     if not convo:

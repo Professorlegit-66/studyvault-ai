@@ -22,7 +22,11 @@ interface Memory {
   created_at: string;
 }
 
-export const AICompanion: React.FC = () => {
+interface AICompanionProps {
+  isActive?: boolean;
+}
+
+export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<CompanionMessage[]>([]);
@@ -71,9 +75,11 @@ export const AICompanion: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchConversations();
-    fetchMemories();
-  }, []);
+    if (isActive) {
+      fetchConversations();
+      fetchMemories();
+    }
+  }, [isActive]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

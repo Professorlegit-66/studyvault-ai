@@ -28,7 +28,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: 'ai',
-      text: 'Hello! I am your AI Tutor. Ask me anything about your uploaded study documents or notes!',
+      text: 'Hello! I am your AI Tutor. Ask me any question about your uploaded documents, or select specific files above to focus our discussion.',
     },
   ]);
 
@@ -222,6 +222,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
         <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col">
           <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'home' ? 'flex' : 'hidden'}`}>
             <HomeOverview
+              isActive={activeTab === 'home'}
               userName={displayName}
               documentCount={documents.length}
               onNavigate={(tab) => setActiveTab(tab as any)}
@@ -229,19 +230,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
           </div>
 
           <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'documents' ? 'flex' : 'hidden'}`}>
-            <DocumentManager documents={documents} onDocumentsChange={fetchDocuments} />
+            <DocumentManager 
+              isActive={activeTab === 'documents'}
+              documents={documents} 
+              onDocumentsChange={fetchDocuments} 
+            />
           </div>
 
           <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'chat' ? 'flex' : 'hidden'}`}>
-            <AITutorChat documents={documents} messages={messages} setMessages={setMessages} />
+            <AITutorChat 
+              isActive={activeTab === 'chat'}
+              documents={documents} 
+              messages={messages} 
+              setMessages={setMessages} 
+            />
           </div>
 
           <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'companion' ? 'flex' : 'hidden'}`}>
-            <AICompanion />
+            <AICompanion isActive={activeTab === 'companion'} />
           </div>
 
           <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'memory' ? 'flex' : 'hidden'}`}>
-            <StudentMemory />
+            <StudentMemory isActive={activeTab === 'memory'} />
           </div>
         </div>
       </main>

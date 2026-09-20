@@ -33,7 +33,11 @@ interface Flashcard {
   ease_factor?: number;
 }
 
-export const StudentMemory: React.FC = () => {
+interface StudentMemoryProps {
+  isActive?: boolean;
+}
+
+export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true }) => {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -71,8 +75,10 @@ export const StudentMemory: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchCards();
-  }, []);
+    if (isActive) {
+      fetchCards();
+    }
+  }, [isActive]);
 
   // Close dropdown on outside click
   useEffect(() => {
