@@ -231,7 +231,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
           <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'documents' ? 'flex' : 'hidden'}`}>
             <DocumentManager 
-              isActive={activeTab === 'documents'}
               documents={documents} 
               onDocumentsChange={fetchDocuments} 
             />
@@ -239,7 +238,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
           <div className={`flex-col flex-1 min-h-0 w-full ${activeTab === 'chat' ? 'flex' : 'hidden'}`}>
             <AITutorChat 
-              isActive={activeTab === 'chat'}
               documents={documents} 
               messages={messages} 
               setMessages={setMessages} 

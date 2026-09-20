@@ -25,13 +25,11 @@ const formatFileSize = (bytes?: number): string => {
 };
 
 interface DocumentManagerProps {
-  isActive?: boolean;
   documents: Document[];
   onDocumentsChange: () => void;
 }
 
 export const DocumentManager: React.FC<DocumentManagerProps> = ({ 
-  isActive = true, 
   documents, 
   onDocumentsChange 
 }) => {
