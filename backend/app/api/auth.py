@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
@@ -71,22 +71,38 @@ def _issue_and_send_otp(user: User, target_email: Optional[str] = None) -> None:
     send_verification_email(to_email=target_email or user.email, otp_code=code, user_name=user.name)
 
 
-def _update_login_streak(user: User) -> None:
-    """Updates user.current_streak and user.last_login_date in place."""
-    today = datetime.now(timezone.utc).date()
+def _resolve_local_date(client_utc_offset_minutes: Optional[int]) -> date:
+    """
+    Resolves "today" from the client's perspective.
 
+    client_utc_offset_minutes follows the JS `Date.getTimezoneOffset()`
+    convention: positive when local time is BEHIND UTC (e.g. US Eastern
+    Standard Time = +300), negative when AHEAD of UTC (e.g. India = -330).
+    local_time = utc_time - offset.
+
+    If the header is missing (older client, direct API call, etc.), falls
+    back to plain UTC so behavior degrades gracefully instead of erroring.
+    """
+    now_utc = datetime.now(timezone.utc)
+    offset = client_utc_offset_minutes if client_utc_offset_minutes is not None else 0
+    local_dt = now_utc - timedelta(minutes=offset)
+    return local_dt.date()
+
+
+def _update_login_streak(user: User, local_date: date) -> None:
+    """Updates user.current_streak and user.last_login_date in place."""
     if user.last_login_date is None:
         user.current_streak = 1
-    elif user.last_login_date == today:
-        # Self-repair: If the user is active today but streak is stuck at 0, restore it to 1
-        if not user.current_streak or user.current_streak == 0:
+    elif user.last_login_date == local_date:
+        # FIX: Repair stuck 0 streak if user is active today
+        if not user.current_streak or user.current_streak <= 0:
             user.current_streak = 1
-    elif user.last_login_date == today - timedelta(days=1):
+    elif user.last_login_date == local_date - timedelta(days=1):
         user.current_streak = (user.current_streak or 0) + 1
     else:
         user.current_streak = 1
 
-    user.last_login_date = today
+    user.last_login_date = local_date
 
 
 @router.post("/register", response_model=RegisterResponse)
@@ -129,7 +145,11 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/verify-email", response_model=Token)
-async def verify_email(payload: VerifyEmailRequest, db: AsyncSession = Depends(get_db)):
+async def verify_email(
+    payload: VerifyEmailRequest,
+    db: AsyncSession = Depends(get_db),
+    x_client_utc_offset: Optional[int] = Header(default=None, alias="X-Client-UTC-Offset"),
+):
     stmt = select(User).where(User.email == payload.email)
     user = (await db.execute(stmt)).scalar_one_or_none()
 
@@ -151,7 +171,7 @@ async def verify_email(payload: VerifyEmailRequest, db: AsyncSession = Depends(g
     user.is_verified = True
     user.verification_code = None
     user.verification_code_expires_at = None
-    _update_login_streak(user)
+    _update_login_streak(user, _resolve_local_date(x_client_utc_offset))
     await db.commit()
 
     access_token = create_access_token(data={"sub": str(user.id)})
@@ -183,7 +203,11 @@ async def resend_verification(payload: ResendVerificationRequest, db: AsyncSessi
 
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
+    x_client_utc_offset: Optional[int] = Header(default=None, alias="X-Client-UTC-Offset"),
+):
     stmt = select(User).where(User.email == form_data.username)
     user = (await db.execute(stmt)).scalar_one_or_none()
 
@@ -200,7 +224,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
             detail="Please verify your email before logging in.",
         )
 
-    _update_login_streak(user)
+    _update_login_streak(user, _resolve_local_date(x_client_utc_offset))
     await db.commit()
 
     access_token = create_access_token(data={"sub": str(user.id)})
@@ -211,8 +235,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 async def get_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    x_client_utc_offset: Optional[int] = Header(default=None, alias="X-Client-UTC-Offset"),
 ):
-    _update_login_streak(current_user)
+    _update_login_streak(current_user, _resolve_local_date(x_client_utc_offset))
     await db.commit()
     await db.refresh(current_user)
     return current_user

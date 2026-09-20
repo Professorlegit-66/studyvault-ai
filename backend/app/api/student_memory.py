@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -98,7 +98,7 @@ async def review_flashcard(
             review_entry = ReviewLog(
                 user_id=current_user.id,
                 flashcard_id=card.id,
-                rating=rating_label,
+                quality=payload.quality,
                 reviewed_at=now,
             )
             db.add(review_entry)
@@ -225,6 +225,71 @@ async def delete_flashcard(
     await db.delete(card)
     await db.commit()
     return {"message": "Flashcard deleted successfully"}
+
+@router.post("/review/{card_id}", response_model=FlashcardResponse)
+async def review_flashcard(
+    card_id: int,
+    payload: ReviewRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(Flashcard).where(
+        Flashcard.id == card_id,
+        Flashcard.user_id == current_user.id,
+    )
+    card = (await db.execute(stmt)).scalar_one_or_none()
+    if not card:
+        raise HTTPException(status_code=404, detail="Flashcard not found")
+
+    rep, interval, ef, next_review = calculate_sm2(
+        quality=payload.quality,
+        repetition=card.repetition_number,
+        interval=card.interval_days,
+        ease_factor=card.ease_factor,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    # 1. Update Flashcard SM-2 stats
+    card.repetition_number = rep
+    card.interval_days = interval
+    card.ease_factor = ef
+    card.next_review_at = next_review
+    card.last_reviewed_at = now
+
+    # 2. Actively update User Study Streak based on UTC study actions
+    today = now.date()
+    if current_user.last_login_date != today:
+        if current_user.last_login_date == today - timedelta(days=1):
+            current_user.current_streak = (current_user.current_streak or 0) + 1
+        else:
+            current_user.current_streak = 1
+        current_user.last_login_date = today
+
+    # 3. Log review activity inside an isolated nested transaction
+    try:
+        async with db.begin_nested():
+            review_entry = ReviewLog(
+                user_id=current_user.id,
+                flashcard_id=card.id,
+                quality=payload.quality,
+                reviewed_at=now,
+            )
+            db.add(review_entry)
+    except Exception as log_err:
+        print(f"[Student Memory] ReviewLog insert warning: {log_err}")
+
+    try:
+        await db.commit()
+        await db.refresh(card)
+        return card
+    except Exception as commit_err:
+        await db.rollback()
+        print(f"[Student Memory] Review commit error: {commit_err}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to record review progress.",
+        )
 
 
 @router.delete("/orphaned")

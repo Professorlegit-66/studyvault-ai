@@ -27,7 +27,8 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
   const [streakDays, setStreakDays] = useState<number | null>(null);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [totalContributions, setTotalContributions] = useState<number>(0);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  // Use UTC year consistently — the backend buckets everything by UTC date
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getUTCFullYear());
 
   const availableYears = [2026, 2025];
 
@@ -78,24 +79,27 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
     setTotalContributions(yearTotal);
 
     const days: HeatmapDay[] = [];
-    const startDate = new Date(year, 0, 1);
-    const startDay = startDate.getDay();
+    const startDate = new Date(Date.UTC(year, 0, 1));
+    const startDay = startDate.getUTCDay();
     const diffToMon = startDay === 0 ? -6 : 1 - startDay;
-    startDate.setDate(startDate.getDate() + diffToMon);
+    startDate.setUTCDate(startDate.getUTCDate() + diffToMon);
 
-    const isCurrentYear = year === new Date().getFullYear();
-    const endDate = isCurrentYear ? new Date() : new Date(year, 11, 31);
+    const now = new Date();
+    const isCurrentYear = year === now.getUTCFullYear();
+    const endDate = isCurrentYear
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+      : new Date(Date.UTC(year, 11, 31));
 
     let curr = new Date(startDate);
     while (curr <= endDate) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
+      const y = curr.getUTCFullYear();
+      const m = String(curr.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(curr.getUTCDate()).padStart(2, '0');
       const dateStr = `${y}-${m}-${d}`;
 
       const count = y === year ? (daysMap.get(dateStr) || 0) : 0;
       days.push({ date: dateStr, count });
-      curr.setDate(curr.getDate() + 1);
+      curr.setUTCDate(curr.getUTCDate() + 1);
     }
     setHeatmapData(days);
   };
@@ -116,15 +120,17 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
   let lastMonth = -1;
   weeks.forEach((week, idx) => {
     if (week.length > 0) {
-      const validDay = week.find(d => new Date(d.date).getFullYear() === selectedYear) || week[0];
-      const d = new Date(validDay.date);
-      const m = d.getMonth();
-      if (m !== lastMonth && d.getFullYear() === selectedYear) {
+      const validDay = week.find(d => Number(d.date.slice(0, 4)) === selectedYear) || week[0];
+      const [yy, mm] = validDay.date.split('-').map(Number);
+      if (mm - 1 !== lastMonth && yy === selectedYear) {
         monthLabels.push({
-          label: d.toLocaleString('default', { month: 'short' }),
+          label: new Date(Date.UTC(yy, mm - 1, 1)).toLocaleString('default', {
+            month: 'short',
+            timeZone: 'UTC'
+          }),
           weekIndex: idx
         });
-        lastMonth = m;
+        lastMonth = mm - 1;
       }
     }
   });
@@ -207,7 +213,7 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ userName, documentCo
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Active recall consistency and review history</p>
           </div>
-          
+
           <div className="flex items-center gap-1.5">
             {availableYears.map((year) => (
               <button

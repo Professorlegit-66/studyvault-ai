@@ -118,8 +118,8 @@ export const StudentMemory: React.FC = () => {
   const filteredCards = useMemo(() => {
     return flashcards.filter((card) => {
       const matchesSearch =
-        card.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        card.answer.toLowerCase().includes(searchQuery.toLowerCase());
+        card.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        card.answer?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTopic =
         selectedTopic === 'all' || card.topic === selectedTopic;
       return matchesSearch && matchesTopic;
@@ -473,13 +473,14 @@ export const StudentMemory: React.FC = () => {
               </div>
             </div>
 
+            {/* FLIP CARD CONTAINER (Using CSS Grid instead of fixed absolute positioning) */}
             <div
               onClick={() => setIsFlipped(!isFlipped)}
-              className="relative min-h-[190px] sm:min-h-[220px] w-full cursor-pointer group"
+              className="relative w-full cursor-pointer group shrink-0"
               style={{ perspective: '1200px' }}
             >
               <div
-                className="relative w-full h-full min-h-[190px] sm:min-h-[220px] transition-transform duration-500 rounded-xl"
+                className="grid w-full transition-transform duration-500 rounded-xl"
                 style={{
                   transformStyle: 'preserve-3d',
                   transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
@@ -487,20 +488,27 @@ export const StudentMemory: React.FC = () => {
               >
                 {/* Front Side */}
                 <div
-                  className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-5 sm:p-6 flex flex-col items-center justify-center text-center"
+                  className="col-start-1 row-start-1 w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 sm:p-6 flex flex-col items-center text-center min-h-[250px] max-h-[65vh]"
                   style={{
                     backfaceVisibility: 'hidden',
                     WebkitBackfaceVisibility: 'hidden',
-                    transform: 'translateZ(1px)'
+                    transform: 'translateZ(1px)' // Prevents rendering glitches
                   }}
                 >
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-600 dark:text-indigo-400 mb-2">
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-600 dark:text-indigo-400 mb-4 shrink-0">
                     QUESTION (CLICK TO FLIP)
                   </span>
-                  <p className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-slate-100 leading-relaxed max-w-3xl">
-                    {currentCard.question}
-                  </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium pt-3 flex items-center gap-1.5">
+                  
+                  {/* WRAPPED QUESTION CONTAINER - Centers short text, scrolls long text */}
+                  <div className="flex-1 w-full overflow-y-auto break-words whitespace-pre-wrap px-2 sm:px-4 text-center custom-scrollbar flex flex-col">
+                    <div className="m-auto w-full">
+                      <p className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 leading-relaxed max-w-4xl mx-auto py-2">
+                        {currentCard.question}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium pt-4 flex items-center gap-1.5 shrink-0 mt-auto">
                     <span>Click or press</span>
                     <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded font-mono text-[10px] font-bold text-slate-800 dark:text-slate-200 shadow-xs">
                       Space
@@ -511,20 +519,27 @@ export const StudentMemory: React.FC = () => {
 
                 {/* Back Side */}
                 <div
-                  className="absolute inset-0 w-full h-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-5 sm:p-6 flex flex-col items-center justify-center text-center"
+                  className="col-start-1 row-start-1 w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 sm:p-6 flex flex-col items-center text-center min-h-[250px] max-h-[65vh]"
                   style={{
                     backfaceVisibility: 'hidden',
                     WebkitBackfaceVisibility: 'hidden',
                     transform: 'rotateY(180deg) translateZ(1px)'
                   }}
                 >
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-600 dark:text-emerald-400 mb-4 shrink-0">
                     ANSWER
                   </span>
-                  <p className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 leading-relaxed max-w-3xl">
-                    {currentCard.answer}
-                  </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium pt-3">
+                  
+                  {/* WRAPPED ANSWER CONTAINER - Centers short text, scrolls long text */}
+                  <div className="flex-1 w-full overflow-y-auto break-words whitespace-pre-wrap px-2 sm:px-4 text-center custom-scrollbar flex flex-col">
+                    <div className="m-auto w-full">
+                      <p className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 leading-relaxed max-w-4xl mx-auto py-2">
+                        {currentCard.answer}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium pt-4 shrink-0 mt-auto">
                     Rate your active recall difficulty below:
                   </p>
                 </div>
@@ -533,7 +548,7 @@ export const StudentMemory: React.FC = () => {
 
             {/* Rating Action Buttons */}
             {isFlipped ? (
-              <div className="space-y-2 pt-1">
+              <div className="space-y-2 pt-1 shrink-0">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <button
                     disabled={submitting}
@@ -587,7 +602,7 @@ export const StudentMemory: React.FC = () => {
             ) : (
               <button
                 onClick={() => setIsFlipped(true)}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-2 shrink-0"
               >
                 <RotateCw className="w-4 h-4" />
                 <span>Show Answer</span>
