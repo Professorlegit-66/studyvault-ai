@@ -1,5 +1,6 @@
 import math
 import traceback
+import asyncio
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,7 @@ from sqlalchemy import select, desc
 from pydantic import BaseModel
 from google import genai
 from google.genai import types, errors
+import httpx
 
 from app.database import get_db
 from app.api.auth import get_current_user
@@ -21,7 +23,6 @@ router = APIRouter(prefix="/rag", tags=["rag"])
 
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
-# Similarity threshold to filter out noise
 MIN_SIMILARITY_THRESHOLD = 0.25
 
 
@@ -116,6 +117,9 @@ async def chat_with_docs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    answer_text = "I could not generate a response."
+    formatted_sources = []
+
     try:
         stmt = (
             select(DocumentChunk, Document)
@@ -136,13 +140,28 @@ async def chat_with_docs(
                 sources=[],
             )
 
-        # 1. Embed user query
-        emb_res = client.models.embed_content(
-            model="gemini-embedding-001", contents=request.query
-        )
+        emb_res = None
+        last_emb_error = None
+
+        for attempt in range(3):
+            try:
+                emb_res = await client.aio.models.embed_content(
+                    model="gemini-embedding-001", contents=request.query
+                )
+                break
+            except Exception as emb_ex:
+                last_emb_error = emb_ex
+                print(f"[RAG Embedding Retry {attempt+1}/3] Failed: {emb_ex}")
+                await asyncio.sleep(2)
+
+        if not emb_res:
+            raise HTTPException(
+                status_code=429,
+                detail="Embedding rate limit or usage limit reached. Please wait a moment and try again.",
+            )
+
         query_vector = list(emb_res.embeddings[0].values)
 
-        # 2. Score similarity across chunks
         scored_chunks = []
         for chunk, doc in results:
             if chunk.embedding:
@@ -150,7 +169,7 @@ async def chat_with_docs(
                 sim = cosine_similarity(query_vector, chunk_vector)
                 if sim >= MIN_SIMILARITY_THRESHOLD:
                     scored_chunks.append(
-                        (sim, chunk.content, doc.title, chunk.chunk_index)
+                        (sim, chunk.content, doc.title, chunk.chunk_index, chunk.page_number)
                     )
 
         if not scored_chunks:
@@ -170,7 +189,7 @@ async def chat_with_docs(
         seen_docs = set()
 
         for item in scored_chunks:
-            sim, content, title, chunk_idx = item
+            sim, content, title, chunk_idx, page_num = item
             if title not in seen_docs and len(top_chunks) < target_chunk_limit:
                 top_chunks.append(item)
                 seen_docs.add(title)
@@ -181,10 +200,17 @@ async def chat_with_docs(
             if item not in top_chunks:
                 top_chunks.append(item)
 
-        sources = list(set([item[2] for item in top_chunks]))
+        formatted_sources = list(
+            set(
+                [
+                    f"{item[2]} (p. {item[4]})" if item[4] else item[2]
+                    for item in top_chunks
+                ]
+            )
+        )
 
         context_blocks = [
-            f"[Source: {item[2]} | Chunk #{item[3]}]\n{item[1]}"
+            f"[Source: {item[2]}{f', p. {item[4]}' if item[4] else ''}]\n{item[1]}"
             for item in top_chunks
         ]
         context = "\n\n---\n\n".join(context_blocks)
@@ -203,7 +229,7 @@ async def chat_with_docs(
 Guidelines:
 1. Start directly with the answer. Do NOT use greetings (e.g., "Hello") or state "Based on the provided context."
 2. Answer strictly using the provided Context from Vault below. If the information is not present, state clearly that it is missing from the document.
-3. Cite sources naturally using the document titles provided in the context blocks.
+3. Cite sources inline naturally using the exact document title and page number format, e.g. [Document Title, p. X] or [Document Title].
 {multi_prompt_instruction}
 
 Context from Vault:
@@ -212,17 +238,75 @@ Context from Vault:
 User Question: {request.query}
 """
 
-        gen_res = client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-            ),
-        )
+        models_to_try = [
+            "gemini-3.6-flash",
+            "gemini-3.7-flash",
+            "gemini-flash-latest",
+        ]
 
-        answer_text = gen_res.text or "I could not generate a response."
+        gen_res = None
+        last_error = None
 
-        # Save exchange in database for chat persistence
+        for model_name in models_to_try:
+            try:
+                gen_res = await asyncio.wait_for(
+                    client.aio.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            temperature=0.2,
+                        ),
+                    ),
+                    timeout=5.0  # Reduced to 5s for ultra-fast failover
+                )
+                print(f"[RAG Success] Generated response using model: {model_name}")
+                break
+            except asyncio.TimeoutError:
+                print(f"[RAG Model Fallback] Model '{model_name}' timed out after 5s, trying next...")
+                continue
+            except Exception as ex:
+                last_error = ex
+                print(f"[RAG Model Fallback] Model '{model_name}' failed, trying next... Error: {ex}")
+
+        # Fallback to Groq Cloud (Llama 3.1) if all Gemini models fail
+        if not gen_res or not gen_res.text:
+            print("[RAG Fallback] Gemini exhausted. Switching to Groq Cloud (Llama 3.1)...")
+            if not settings.GROQ_API_KEY:
+                raise HTTPException(status_code=503, detail="Gemini is unavailable and GROQ_API_KEY is not configured.")
+                
+            try:
+                # 30-second timeout is plenty for Groq's LPUs
+                async with httpx.AsyncClient(timeout=30.0) as cloud_client:
+                    response = await cloud_client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                        "model": "openai/gpt-oss-20b", # Updated from llama-3.1-8b-instant
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.2
+                    }
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        answer_text = data["choices"][0]["message"]["content"].strip()
+                        print("[RAG Success] Generated response using Groq Cloud!")
+                    elif response.status_code == 429:
+                         raise Exception("Groq Cloud rate limit reached.")
+                    else:
+                        raise Exception(f"Groq API error {response.status_code}: {response.text}")
+                        
+            except Exception as cloud_ex:
+                print(f"[RAG Groq Failed] {cloud_ex}")
+                if last_error:
+                    raise last_error
+                raise HTTPException(status_code=503, detail="All AI providers (Gemini and Groq) are currently unavailable.")
+        else:
+            answer_text = gen_res.text.strip()
+
         title_key = (
             f"rag_doc_{request.document_id}"
             if request.document_id
@@ -241,9 +325,10 @@ User Question: {request.query}
         )
         await db.commit()
 
-        return ChatResponse(answer=answer_text, sources=sources)
+        return ChatResponse(answer=answer_text, sources=formatted_sources)
 
     except errors.APIError as e:
+        print(f"\n>>> GEMINI API ERROR: code={getattr(e, 'code', 'N/A')} message={getattr(e, 'message', str(e))} <<<\n")
         if e.code == 503:
             raise HTTPException(
                 status_code=503,
@@ -263,8 +348,9 @@ User Question: {request.query}
     except Exception as e:
         print("\n=== RAG CHAT ERROR TRACEBACK ===")
         traceback.print_exc()
+        print(f"Raw Exception: {str(e)}")
         print("================================\n")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected internal server error occurred.",
+            detail=f"An unexpected internal server error occurred: {str(e)}",
         )

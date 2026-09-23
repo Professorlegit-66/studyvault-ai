@@ -1,62 +1,44 @@
 import json
-from datetime import datetime
+import traceback
+import asyncio
 from typing import List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from pydantic import BaseModel
 from google import genai
-from google.genai import types
+from google.genai import types, errors
+import httpx
 
 from app.database import get_db
+from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.companion_memory import CompanionMemory
-from app.api.deps import get_current_user
 from app.config import settings
 
-router = APIRouter(prefix="/companion", tags=["AI Companion"])
+router = APIRouter(prefix="/companion", tags=["companion"])
 
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
-HISTORY_WINDOW = 20
+ACTIVE_COMPANION_MODELS = [
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-flash-latest",
+]
 
-class ConversationResponse(BaseModel):
-    id: int
-    title: str
-    created_at: datetime
+class MessageCreate(BaseModel):
+    message: Optional[str] = None
+    content: Optional[str] = None
+    text: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    @property
+    def actual_text(self) -> str:
+        return self.message or self.content or self.text or ""
 
-class MessageResponse(BaseModel):
-    id: int
-    sender: str
-    content: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class MemoryResponse(BaseModel):
-    id: int
-    content: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class ChatRequest(BaseModel):
-    message: str
-
-class ChatResponse(BaseModel):
-    reply: str
-    remembered: Optional[str] = None
-
-@router.get("/conversations", response_model=List[ConversationResponse])
-async def list_conversations(
+@router.get("/conversations", response_model=List[dict])
+async def get_conversations(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -64,14 +46,14 @@ async def list_conversations(
         select(Conversation)
         .where(
             Conversation.user_id == current_user.id,
-            Conversation.title.not_like("rag_%")  # Exclude AI Tutor conversations
+            ~Conversation.title.like("rag_%"),
         )
         .order_by(desc(Conversation.created_at))
     )
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    convos = (await db.execute(stmt)).scalars().all()
+    return [{"id": c.id, "title": c.title, "created_at": c.created_at.isoformat()} for c in convos]
 
-@router.post("/conversations", response_model=ConversationResponse)
+@router.post("/conversations", response_model=dict)
 async def create_conversation(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -80,52 +62,29 @@ async def create_conversation(
     db.add(convo)
     await db.commit()
     await db.refresh(convo)
-    return convo
+    return {"id": convo.id, "title": convo.title, "created_at": convo.created_at.isoformat()}
 
-@router.delete("/conversations/{conversation_id}")
+@router.delete("/conversations/{convo_id}")
 async def delete_conversation(
-    conversation_id: int,
+    convo_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Conversation).where(
-        Conversation.id == conversation_id,
-        Conversation.user_id == current_user.id,
-        Conversation.title.not_like("rag_%")  # Prevent deleting RAG chats from Companion API
+        Conversation.id == convo_id, Conversation.user_id == current_user.id
     )
     convo = (await db.execute(stmt)).scalar_one_or_none()
-    if not convo:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    await db.delete(convo)
-    await db.commit()
+    if convo:
+        msg_stmt = select(Message).where(Message.conversation_id == convo.id)
+        msgs = (await db.execute(msg_stmt)).scalars().all()
+        for m in msgs:
+            await db.delete(m)
+        await db.delete(convo)
+        await db.commit()
     return {"message": "Conversation deleted successfully"}
 
-@router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
-async def get_conversation_messages(
-    conversation_id: int,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    convo_stmt = select(Conversation).where(
-        Conversation.id == conversation_id,
-        Conversation.user_id == current_user.id,
-        Conversation.title.not_like("rag_%")  # Prevent viewing RAG chats from Companion API
-    )
-    convo = (await db.execute(convo_stmt)).scalar_one_or_none()
-    if not convo:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    msg_stmt = (
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
-    )
-    result = await db.execute(msg_stmt)
-    return result.scalars().all()
-
-@router.get("/memories", response_model=List[MemoryResponse])
-async def list_memories(
+@router.get("/memories", response_model=List[dict])
+async def get_memories(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -134,8 +93,8 @@ async def list_memories(
         .where(CompanionMemory.user_id == current_user.id)
         .order_by(desc(CompanionMemory.created_at))
     )
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    memories = (await db.execute(stmt)).scalars().all()
+    return [{"id": m.id, "content": m.content, "created_at": m.created_at.isoformat()} for m in memories]
 
 @router.delete("/memories/{memory_id}")
 async def delete_memory(
@@ -144,125 +103,212 @@ async def delete_memory(
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(CompanionMemory).where(
-        CompanionMemory.id == memory_id,
-        CompanionMemory.user_id == current_user.id,
+        CompanionMemory.id == memory_id, CompanionMemory.user_id == current_user.id
     )
-    memory = (await db.execute(stmt)).scalar_one_or_none()
-    if not memory:
-        raise HTTPException(status_code=404, detail="Memory not found")
-
-    await db.delete(memory)
-    await db.commit()
+    mem = (await db.execute(stmt)).scalar_one_or_none()
+    if mem:
+        await db.delete(mem)
+        await db.commit()
     return {"message": "Memory deleted successfully"}
 
-def _build_prompt(memories: List[CompanionMemory], history: List[Message], new_message: str) -> str:
-    memory_block = (
-        "\n".join(f"- {m.content}" for m in memories)
-        if memories
-        else "(no saved facts about this user yet)"
-    )
-    history_block = (
-        "\n".join(f"{m.sender.upper()}: {m.content}" for m in history)
-        if history
-        else "(this is the start of the conversation)"
-    )
-
-    return f"""You are a friendly, general-purpose AI companion inside StudyVault AI.
-
-Known facts about this user:
-{memory_block}
-
-Recent conversation history:
-{history_block}
-
-New message from user: {new_message}
-
-If and only if the user explicitly requests to store a personal fact for future chats (e.g., "remember that...", "keep in mind..."), extract that fact into the "remember" key. Otherwise, set "remember" to null.
-"""
-
-@router.post("/conversations/{conversation_id}/chat", response_model=ChatResponse)
-async def chat_with_companion(
-    conversation_id: int,
-    payload: ChatRequest,
+@router.get("/conversations/{convo_id}/messages", response_model=List[dict])
+async def get_messages(
+    convo_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    convo_stmt = select(Conversation).where(
-        Conversation.id == conversation_id,
-        Conversation.user_id == current_user.id,
-        Conversation.title.not_like("rag_%")  # Prevent chatting in RAG chats from Companion API
+    stmt = select(Conversation).where(
+        Conversation.id == convo_id, Conversation.user_id == current_user.id
     )
-    convo = (await db.execute(convo_stmt)).scalar_one_or_none()
+    convo = (await db.execute(stmt)).scalar_one_or_none()
     if not convo:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    if not payload.message.strip():
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
-
-    memories_stmt = select(CompanionMemory).where(CompanionMemory.user_id == current_user.id)
-    memories = (await db.execute(memories_stmt)).scalars().all()
-
-    history_stmt = (
+    msg_stmt = (
         select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(desc(Message.created_at))
-        .limit(HISTORY_WINDOW)
+        .where(Message.conversation_id == convo.id)
+        .order_by(Message.created_at)
     )
-    recent_history = list(reversed((await db.execute(history_stmt)).scalars().all()))
+    messages = (await db.execute(msg_stmt)).scalars().all()
+    
+    return [
+        {
+            "id": m.id,
+            "sender": m.sender,
+            "text": m.content,       
+            "content": m.content,    
+            "message": m.content,    
+            "created_at": m.created_at.isoformat(),
+        }
+        for m in messages
+    ]
 
-    prompt = _build_prompt(memories, recent_history, payload.message)
+@router.post("/conversations/{convo_id}/chat", response_model=dict)
+async def chat_with_companion(
+    convo_id: int,
+    payload: MessageCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_msg_text = payload.actual_text
+    
+    if not user_msg_text:
+        raise HTTPException(status_code=400, detail="Message content cannot be empty")
+
+    stmt = select(Conversation).where(
+        Conversation.id == convo_id,
+        Conversation.user_id == current_user.id,
+        ~Conversation.title.like("rag_%"),
+    )
+    convo = (await db.execute(stmt)).scalar_one_or_none()
+    if not convo:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    mem_stmt = select(CompanionMemory).where(CompanionMemory.user_id == current_user.id)
+    memories = (await db.execute(mem_stmt)).scalars().all()
+    memory_context = "\n".join([f"- {m.content}" for m in memories]) if memories else "None recorded yet."
+
+    hist_stmt = (
+        select(Message)
+        .where(Message.conversation_id == convo.id)
+        .order_by(desc(Message.created_at))
+        .limit(20)
+    )
+    history_messages = (await db.execute(hist_stmt)).scalars().all()
+    history_messages.reverse()
+
+    history_text = "\n".join([f"{m.sender.capitalize()}: {m.content}" for m in history_messages])
+
+    prompt = f"""You are StudyVault AI's Companion, a warm, supportive, and friendly general-purpose mentor.
+User Name: {current_user.name}
+
+Stored Memories about the User:
+{memory_context}
+
+Chat History:
+{history_text}
+User: {user_msg_text}
+
+Respond to the user naturally. If the user explicitly asks you to remember something about them (e.g., "remember that I like Python"), include that fact in the 'remember' field. Otherwise, set 'remember' to null.
+
+Output in JSON format with keys:
+- "reply": string (your conversational response. You MUST use Markdown formatting here for readability. Use **bolding** for emphasis, bullet points for lists, and \\n\\n for paragraph breaks.)
+- "remember": string or null (fact to store, if any)
+"""
+
+    gen_res = None
+    last_error = None
+
+    for model_name in ACTIVE_COMPANION_MODELS:
+        try:
+            gen_res = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.6,
+                        response_mime_type="application/json",
+                        response_schema={
+                            "type": "OBJECT",
+                            "properties": {
+                                "reply": {"type": "STRING"},
+                                "remember": {"type": "STRING", "nullable": True},
+                            },
+                            "required": ["reply"],
+                        },
+                    ),
+                ),
+                timeout=5.0,  # Reduced to 5s for ultra-fast failover
+            )
+            print(f"[Companion Success] Generated response using model: {model_name}")
+            break
+        except asyncio.TimeoutError:
+            print(f"[Companion Fallback] Model '{model_name}' timed out after 5s, trying next...")
+            continue
+        except Exception as e:
+            last_error = e
+            print(f"[Companion Fallback] Model '{model_name}' failed: {e}")
+            continue
 
     reply_text = "Sorry, I couldn't come up with a response just now."
-    remembered_fact: Optional[str] = None
+    remembered_fact = None
 
-    try:
-        gen_res = client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.6,
-                response_mime_type="application/json",
-                response_schema={
-                    "type": "OBJECT",
-                    "properties": {
-                        "reply": {"type": "STRING"},
-                        "remember": {"type": "STRING", "nullable": True}
+    # Fallback to Groq Cloud (Llama 3.1) if all Gemini models fail
+    if not gen_res or not gen_res.text:
+        print("[Companion Fallback] Gemini exhausted. Switching to Groq Cloud (Llama 3.1)...")
+        try:
+            if not settings.GROQ_API_KEY:
+                raise Exception("GROQ_API_KEY not configured")
+                
+            async with httpx.AsyncClient(timeout=30.0) as cloud_client:
+                response = await cloud_client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                        "Content-Type": "application/json"
                     },
-                    "required": ["reply"]
-                }
-            ),
-        )
+                    json={
+                        "model": "openai/gpt-oss-20b", # Updated from llama-3.1-8b-instant
+                        "messages": [{"role": "user", "content": prompt + "\n\nRespond using strictly valid JSON with keys 'reply' and 'remember'."}],
+                        "temperature": 0.6,
+                        "response_format": {"type": "json_object"}
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    groq_raw = data["choices"][0]["message"]["content"].strip()
+                    try:
+                        parsed = json.loads(groq_raw)
+                        reply_text = parsed.get("reply", "I'm here for you!")
+                        remember_value = parsed.get("remember")
+                        
+                        if remember_value and str(remember_value).lower() != "null":
+                            remembered_fact = str(remember_value).strip()
+                            
+                    except Exception as parse_err:
+                        print(f"[Companion JSON Parse Error] {parse_err}")
+                        reply_text = groq_raw
+                        
+                    print("[Companion Success] Generated response using Groq Cloud!")
+                else:
+                    raise Exception(f"Groq API error {response.status_code}: {response.text}")
+                    
+        except Exception as cloud_ex:
+            print(f"[Companion Groq Failed] {cloud_ex}")
+            reply_text = "I'm having a little trouble connecting to my thought process right now, but I'm still here!"
+    else:
+        try:
+            raw_text = gen_res.text.strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:]
+            if raw_text.startswith("```"):
+                raw_text = raw_text[3:]
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
 
-        parsed = json.loads(gen_res.text.strip())
-        reply_text = parsed.get("reply", reply_text)
-        remember_value = parsed.get("remember")
-        if remember_value and remember_value.lower() != "null":
-            remembered_fact = remember_value.strip()
-
-    except Exception as e:
-        error_str = str(e)
-        if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
-            print(f"[Companion Chat] Gemini rate limit hit: {e}")
-            reply_text = "I've hit my usage limit for the moment. Please try again shortly."
-        else:
-            print(f"[Companion Chat] Generation/parsing failed: {e}")
-            reply_text = "Sorry, something went wrong generating a response. Please try again."
-
-    user_msg = Message(conversation_id=conversation_id, sender="user", content=payload.message)
-    ai_msg = Message(conversation_id=conversation_id, sender="ai", content=reply_text)
-    db.add(user_msg)
-    db.add(ai_msg)
-
-    # Save memory if extracted and not already present
+            parsed = json.loads(raw_text.strip())
+            reply_text = parsed.get("reply", reply_text)
+            remember_value = parsed.get("remember")
+            if remember_value and str(remember_value).lower() != "null":
+                remembered_fact = str(remember_value).strip()
+        except Exception as parse_err:
+            print(f"[Companion JSON Parse Error] {parse_err}")
+            reply_text = gen_res.text
+            
     if remembered_fact:
-        existing_memories = [m.content.lower() for m in memories]
-        if remembered_fact.lower() not in existing_memories:
-            new_memory = CompanionMemory(user_id=current_user.id, content=remembered_fact)
-            db.add(new_memory)
+        db.add(CompanionMemory(user_id=current_user.id, content=remembered_fact))
 
     if convo.title == "New Chat":
-        convo.title = payload.message.strip()[:40] + ("..." if len(payload.message.strip()) > 40 else "")
+        convo.title = user_msg_text[:30] + ("..." if len(user_msg_text) > 30 else "")
 
+    db.add(Message(conversation_id=convo.id, sender="user", content=user_msg_text))
+    db.add(Message(conversation_id=convo.id, sender="ai", content=reply_text))
     await db.commit()
 
-    return ChatResponse(reply=reply_text, remembered=remembered_fact)
+    return {
+        "reply": reply_text,
+        "text": reply_text,  
+        "content": reply_text, 
+        "remembered": remembered_fact,
+    }

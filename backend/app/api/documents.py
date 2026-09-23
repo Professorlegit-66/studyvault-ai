@@ -15,7 +15,7 @@ from app.models.chunk import DocumentChunk
 from app.models.user import User
 from app.api.auth import get_current_user
 from app.config import settings
-from app.services.document_service import save_uploaded_file, extract_text_from_file, TextExtractionError
+from app.services.document_service import save_uploaded_file, extract_pages_from_file, TextExtractionError
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -99,20 +99,6 @@ async def upload_document(
             detail="Unsupported file format. Supported formats: .pdf, .docx, .txt, .md",
         )
 
-    # Reject an exact-filename duplicate (same name AND extension) for this
-    # user before doing any work. Deliberately checks the FULL filename
-    # (including extension), not just the base name - "notes.pdf" and
-    # "notes.docx" are treated as two different documents, since a student
-    # may legitimately have both a PDF and their own Word transcript of the
-    # same material. Case-insensitive, since most people don't treat
-    # "Notes.pdf" and "notes.PDF" as meaningfully different files.
-    #
-    # This check matters more than it might look: it's what actually closes
-    # the false-upload-failure race (see the removed 45s timeout in
-    # DocumentManager.tsx) - if a client-side timeout fires while the
-    # upload is still completing server-side, and the user retries, THIS
-    # check (against the database, not the frontend's possibly-stale state)
-    # is what correctly blocks the accidental second upload.
     existing = (
         await db.execute(
             select(Document).where(
@@ -125,10 +111,9 @@ async def upload_document(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"A document named \"{file.filename}\" already exists. Rename the file, or delete the existing one first.",
+            detail=f'A document named "{file.filename}" already exists. Rename the file, or delete the existing one first.',
         )
 
-    # Safe, collision-proof storage name (never trust the original filename for the path)
     stored_filename, file_path, file_size = await save_uploaded_file(file)
 
     new_doc = Document(
@@ -143,29 +128,33 @@ async def upload_document(
     await db.refresh(new_doc)
 
     try:
-        raw_text = extract_text_from_file(file_path, f".{ext}")
-        text_chunks = chunk_text(raw_text)
+        pages = extract_pages_from_file(file_path, f".{ext}")
+        chunk_idx = 0
 
-        for idx, text_content in enumerate(text_chunks):
-            if not text_content.strip():
-                continue
+        for page_num, page_text in pages:
+            text_chunks = chunk_text(page_text)
+            for text_content in text_chunks:
+                if not text_content.strip():
+                    continue
 
-            emb_res = genai_client.models.embed_content(
-                model="gemini-embedding-001",
-                contents=text_content,
-            )
-            vector = emb_res.embeddings[0].values
+                emb_res = genai_client.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=text_content,
+                )
+                vector = emb_res.embeddings[0].values
 
-            chunk_record = DocumentChunk(
-                document_id=new_doc.id,
-                chunk_index=idx,
-                content=text_content,
-                embedding=vector,
-            )
-            db.add(chunk_record)
+                chunk_record = DocumentChunk(
+                    document_id=new_doc.id,
+                    chunk_index=chunk_idx,
+                    content=text_content,
+                    embedding=vector,
+                    page_number=page_num,
+                )
+                db.add(chunk_record)
+                chunk_idx += 1
 
         await db.commit()
-        print(f"[Upload Success] Created {len(text_chunks)} chunks for document ID {new_doc.id}")
+        print(f"[Upload Success] Created {chunk_idx} chunks across {len(pages)} pages for document ID {new_doc.id}")
 
     except TextExtractionError as e:
         await db.rollback()
