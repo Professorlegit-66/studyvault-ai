@@ -135,9 +135,9 @@ async def get_messages(
         {
             "id": m.id,
             "sender": m.sender,
-            "text": m.content,       
-            "content": m.content,    
-            "message": m.content,    
+            "text": m.content.replace("\\n", "\n") if m.content else "",      
+            "content": m.content.replace("\\n", "\n") if m.content else "",    
+            "message": m.content.replace("\\n", "\n") if m.content else "",    
             "created_at": m.created_at.isoformat(),
         }
         for m in messages
@@ -192,7 +192,7 @@ User: {user_msg_text}
 Respond to the user naturally. If the user explicitly asks you to remember something about them (e.g., "remember that I like Python"), include that fact in the 'remember' field. Otherwise, set 'remember' to null.
 
 Output in JSON format with keys:
-- "reply": string (your conversational response. You MUST use Markdown formatting here for readability. Use **bolding** for emphasis, bullet points for lists, and \\n\\n for paragraph breaks.)
+- "reply": string (your conversational response. You MUST use Markdown formatting here for readability. Use **bolding** for emphasis, bullet points for lists, and normal blank lines between paragraphs for spacing.)
 - "remember": string or null (fact to store, if any)
 """
 
@@ -235,7 +235,7 @@ Output in JSON format with keys:
 
     # Fallback to Groq Cloud (Llama 3.1) if all Gemini models fail
     if not gen_res or not gen_res.text:
-        print("[Companion Fallback] Gemini exhausted. Switching to Groq Cloud (Llama 3.1)...")
+        print("[Companion Fallback] Gemini exhausted. Switching to Groq Cloud...")
         try:
             if not settings.GROQ_API_KEY:
                 raise Exception("GROQ_API_KEY not configured")
@@ -248,7 +248,7 @@ Output in JSON format with keys:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "openai/gpt-oss-20b", # Updated from llama-3.1-8b-instant
+                        "model": "openai/gpt-oss-20b",
                         "messages": [{"role": "user", "content": prompt + "\n\nRespond using strictly valid JSON with keys 'reply' and 'remember'."}],
                         "temperature": 0.6,
                         "response_format": {"type": "json_object"}
@@ -273,7 +273,7 @@ Output in JSON format with keys:
                     print("[Companion Success] Generated response using Groq Cloud!")
                 else:
                     raise Exception(f"Groq API error {response.status_code}: {response.text}")
-                    
+                
         except Exception as cloud_ex:
             print(f"[Companion Groq Failed] {cloud_ex}")
             reply_text = "I'm having a little trouble connecting to my thought process right now, but I'm still here!"
@@ -295,6 +295,9 @@ Output in JSON format with keys:
         except Exception as parse_err:
             print(f"[Companion JSON Parse Error] {parse_err}")
             reply_text = gen_res.text
+
+    # Sanitize any literal escape sequences returned by the model
+    reply_text = reply_text.replace("\\n", "\n")
             
     if remembered_fact:
         db.add(CompanionMemory(user_id=current_user.id, content=remembered_fact))
