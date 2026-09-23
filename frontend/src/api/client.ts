@@ -1,11 +1,17 @@
 import axios from 'axios';
 
+// Automatically ensure the baseURL includes '/api' to prevent 404 Not Found errors
+const getBaseURL = () => {
+  const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  return envUrl.endsWith('/api') ? envUrl : `${envUrl.replace(/\/$/, '')}/api`;
+};
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
-  timeout: 45000, // Render's free tier can take up to ~45-60s to wake from a
-                  // cold start; without a timeout, a slow/stuck wake-up looks
-                  // identical to a frozen app with no way to recover except
-                  // killing the network (see the "stuck loading" bug).
+  baseURL: getBaseURL(),
+  timeout: 180000, // 90 seconds to patiently wait for local Llama 3.2 CPU generation
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 apiClient.interceptors.request.use((config) => {

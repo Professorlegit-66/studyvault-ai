@@ -1,20 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { apiClient } from '../api/client';
 import type { Document } from './DocumentManager';
+import { MessageBubble } from './MessageBubble'; // Ensure path is correct
 import {
-  Send,
-  Bot,
-  User,
-  Loader2,
-  Sparkles,
-  BookOpen,
-  Filter,
-  Check,
-  ChevronDown,
-  Layers,
-  FileText,
-  Trash2
+  Send, Bot, Loader2, Sparkles, Filter, Check, ChevronDown, Layers, FileText, Trash2
 } from 'lucide-react';
 
 export interface Message {
@@ -51,15 +40,9 @@ const MARKDOWN_COMPONENTS = {
   ),
   code: ({ node, inline, ...props }: any) =>
     inline ? (
-      <code
-        className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[13px] text-pink-600 dark:text-pink-400 font-mono"
-        {...props}
-      />
+      <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[13px] text-pink-600 dark:text-pink-400 font-mono" {...props} />
     ) : (
-      <code
-        className="block bg-slate-800 text-slate-50 p-3 rounded-lg text-[13px] overflow-x-auto my-2 font-mono"
-        {...props}
-      />
+      <code className="block bg-slate-800 text-slate-50 p-3 rounded-lg text-[13px] overflow-x-auto my-2 font-mono" {...props} />
     ),
 };
 
@@ -170,12 +153,12 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     return `${selectedIds.length} Documents Selected`;
   }, [selectedIds, documents]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const handleSend = async (e?: React.FormEvent, overrideText?: string) => {
+    if (e) e.preventDefault();
+    const userQuery = overrideText || input.trim();
+    if (!userQuery || loading) return;
 
-    const userQuery = input.trim();
-    setInput('');
+    if (!overrideText) setInput('');
     setMessages((prev) => [
       ...prev,
       { id: Date.now(), sender: 'user', text: userQuery },
@@ -374,46 +357,12 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
           </div>
         ) : (
           messages.map((msg, idx) => (
-            <div
-              key={msg.id ?? `msg-${idx}`}
-              className={`flex gap-3 ${
-                msg.sender === 'user' ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              {msg.sender === 'ai' && (
-                <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit">
-                  <Bot className="w-4 h-4" />
-                </div>
-              )}
-              <div
-                className={`max-w-[80%] p-3.5 rounded-2xl text-sm ${
-                  msg.sender === 'user'
-                    ? 'bg-indigo-600 text-white rounded-br-none'
-                    : 'bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 rounded-bl-none'
-                }`}
-              >
-                {msg.sender === 'user' ? (
-                  <span className="whitespace-pre-wrap">{msg.text}</span>
-                ) : (
-                  <div className="space-y-2 leading-relaxed">
-                    <ReactMarkdown components={MARKDOWN_COMPONENTS}>
-                      {msg.text}
-                    </ReactMarkdown>
-                  </div>
-                )}
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                    <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                    <span>Sources: {msg.sources.join(', ')}</span>
-                  </div>
-                )}
-              </div>
-              {msg.sender === 'user' && (
-                <div className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg h-fit">
-                  <User className="w-4 h-4" />
-                </div>
-              )}
-            </div>
+            <MessageBubble 
+              key={msg.id ?? `msg-${idx}`} 
+              message={msg} 
+              onResubmit={(newText) => handleSend(undefined, newText)}
+              markdownComponents={MARKDOWN_COMPONENTS}
+            />
           ))
         )}
 
