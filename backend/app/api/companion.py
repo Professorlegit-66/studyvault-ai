@@ -32,6 +32,7 @@ class MessageCreate(BaseModel):
     message: Optional[str] = None
     content: Optional[str] = None
     text: Optional[str] = None
+    edit_message_id: Optional[int] = None
 
     @property
     def actual_text(self) -> str:
@@ -164,6 +165,22 @@ async def chat_with_companion(
     if not convo:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
+    if payload.edit_message_id:
+        target_msg_stmt = select(Message).where(
+            Message.id == payload.edit_message_id, 
+            Message.conversation_id == convo.id
+        )
+        target_msg = (await db.execute(target_msg_stmt)).scalar_one_or_none()
+        if target_msg:
+            subsequent_msgs_stmt = select(Message).where(
+                Message.conversation_id == convo.id,
+                Message.id >= target_msg.id
+            )
+            subsequent_msgs = (await db.execute(subsequent_msgs_stmt)).scalars().all()
+            for sm in subsequent_msgs:
+                await db.delete(sm)
+            await db.commit()
+
     mem_stmt = select(CompanionMemory).where(CompanionMemory.user_id == current_user.id)
     memories = (await db.execute(mem_stmt)).scalars().all()
     memory_context = "\n".join([f"- {m.content}" for m in memories]) if memories else "None recorded yet."
@@ -177,7 +194,14 @@ async def chat_with_companion(
     history_messages = (await db.execute(hist_stmt)).scalars().all()
     history_messages.reverse()
 
+    is_first_turn = len(history_messages) == 0
     history_text = "\n".join([f"{m.sender.capitalize()}: {m.content}" for m in history_messages])
+
+    greeting_instruction = (
+        "This is the very first message in this conversation. Welcome the user warmly and invite them to share what's on their mind."
+        if is_first_turn
+        else "This is an ongoing conversation. Do NOT include any introductory greetings, hellos, or welcome back lines (such as 'Hey Talha!'). Continue the conversation naturally, warmly, and helpfully without repeating greetings."
+    )
 
     prompt = f"""You are StudyVault AI's Companion, a warm, supportive, and friendly general-purpose mentor.
 User Name: {current_user.name}
@@ -189,7 +213,10 @@ Chat History:
 {history_text}
 User: {user_msg_text}
 
-Respond to the user naturally. If the user explicitly asks you to remember something about them (e.g., "remember that I like Python"), include that fact in the 'remember' field. Otherwise, set 'remember' to null.
+Instructions:
+- {greeting_instruction}
+- **CRITICAL**: When the user asks you to "explain" specific items from a previous list, **do not** just repeat or parrot the bullet points back. Provide a detailed, practical breakdown of how the feature works, its architecture, and how it can be implemented.
+- If the user explicitly asks you to remember something about them (e.g., "remember that I like Python"), include that fact in the 'remember' field. Otherwise, set 'remember' to null.
 
 Output in JSON format with keys:
 - "reply": string (your conversational response. You MUST use Markdown formatting here for readability. Use **bolding** for emphasis, bullet points for lists, and normal blank lines between paragraphs for spacing.)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api/client';
 import { Sparkles, Plus, Trash2, Send, Brain, X, MessageCircle } from 'lucide-react';
-import { MessageBubble } from './MessageBubble'; // Ensure path is correct
+import { MessageBubble } from './MessageBubble';
 
 interface Conversation {
   id: number;
@@ -26,7 +26,6 @@ interface AICompanionProps {
   isActive?: boolean;
 }
 
-// Reusable Markdown rules for the AI Companion
 const COMPANION_MARKDOWN_COMPONENTS = {
   h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
   h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
@@ -46,7 +45,12 @@ const COMPANION_MARKDOWN_COMPONENTS = {
 
 export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('studyvault_active_companion_id');
+    return saved ? Number(saved) : null;
+  });
+
   const [messages, setMessages] = useState<CompanionMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -55,6 +59,7 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [justRemembered, setJustRemembered] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchConversations = async () => {
@@ -62,6 +67,11 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
     try {
       const res = await apiClient.get<Conversation[]>('/companion/conversations');
       setConversations(res.data);
+      
+      const savedId = localStorage.getItem('studyvault_active_companion_id');
+      if (savedId && res.data.some(c => c.id === Number(savedId))) {
+        fetchMessages(Number(savedId));
+      }
     } catch (err) {
       console.error('Failed to load conversations', err);
     } finally {
@@ -105,6 +115,7 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
 
   const handleSelectConversation = (id: number) => {
     setActiveConversationId(id);
+    localStorage.setItem('studyvault_active_companion_id', String(id));
     fetchMessages(id);
   };
 
@@ -113,6 +124,7 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
       const res = await apiClient.post<Conversation>('/companion/conversations');
       setConversations((prev) => [res.data, ...prev]);
       setActiveConversationId(res.data.id);
+      localStorage.setItem('studyvault_active_companion_id', String(res.data.id));
       setMessages([]);
     } catch (err) {
       console.error('Failed to create conversation', err);
@@ -126,6 +138,7 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (activeConversationId === id) {
         setActiveConversationId(null);
+        localStorage.removeItem('studyvault_active_companion_id');
         setMessages([]);
       }
     } catch (err) {
@@ -153,6 +166,7 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
         const res = await apiClient.post<Conversation>('/companion/conversations');
         conversationId = res.data.id;
         setActiveConversationId(conversationId);
+        localStorage.setItem('studyvault_active_companion_id', String(conversationId));
         setConversations((prev) => [res.data, ...prev]);
       } catch (err) {
         console.error('Failed to start new conversation', err);
@@ -200,6 +214,43 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleEditAndResubmit = async (msgId: number, newText: string) => {
+    const index = messages.findIndex((m) => m.id === msgId);
+    if (index === -1 || !activeConversationId) return;
+
+    const priorMessages = messages.slice(0, index);
+    setMessages(priorMessages);
+
+    const editedUserMessage: CompanionMessage = {
+      id: Date.now(),
+      sender: 'user',
+      content: newText,
+      created_at: new Date().toISOString(),
+    };
+    setMessages([...priorMessages, editedUserMessage]);
+    setIsSending(true);
+
+    try {
+      const chatRes = await apiClient.post<{ reply: string; remembered: string | null }>(
+        `/companion/conversations/${activeConversationId}/chat`,
+        { message: newText, edit_message_id: msgId }
+      );
+
+      const aiMessage: CompanionMessage = {
+        id: Date.now() + 1,
+        sender: 'ai',
+        content: chatRes.data.reply,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+      fetchConversations();
+    } catch (err) {
+      console.error('Failed to edit and resubmit message', err);
     } finally {
       setIsSending(false);
     }
@@ -311,8 +362,8 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
               {messages.map((msg) => (
                 <MessageBubble 
                   key={msg.id} 
-                  message={msg} 
-                  onResubmit={(newText) => handleSend(newText)}
+                  message={{ id: msg.id, sender: msg.sender, content: msg.content }} 
+                  onResubmit={msg.sender === 'user' ? (newText) => handleEditAndResubmit(msg.id, newText) : undefined}
                   markdownComponents={COMPANION_MARKDOWN_COMPONENTS}
                 />
               ))}

@@ -20,17 +20,35 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
   const { user, logout } = useAuth() as { user: { name?: string; username?: string; email?: string } | null; logout: () => void };
-  const [activeTab, setActiveTab] = useState<'home' | 'documents' | 'memory' | 'chat' | 'companion'>('home');
+  
+  // FIX 1: Remember the active tab across page refreshes using localStorage
+  const [activeTab, setActiveTab] = useState<'home' | 'documents' | 'memory' | 'chat' | 'companion'>(() => {
+    const savedTab = localStorage.getItem('studyvault_active_tab');
+    return (savedTab as any) || 'home';
+  });
+  
   const [documents, setDocuments] = useState<Document[]>([]);
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      sender: 'ai',
-      text: 'Hello! I am your AI Tutor. Ask me any question about your uploaded documents, or select specific files above to focus our discussion.',
-    },
-  ]);
+// FIX 2: Start with messages from local storage, or default to an empty array
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('studyvault_tutor_messages');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved messages", e);
+      }
+    }
+    return [];
+  });
+
+  // Whenever messages update, save them permanently to local storage
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('studyvault_tutor_messages', JSON.stringify(messages));
+    }
+  }, [messages]);
 
   const fetchDocuments = async () => {
     try {
@@ -47,6 +65,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
 
   const selectTab = (tab: typeof activeTab) => {
     setActiveTab(tab);
+    localStorage.setItem('studyvault_active_tab', tab);
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }

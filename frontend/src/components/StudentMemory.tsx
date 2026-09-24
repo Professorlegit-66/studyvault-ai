@@ -95,7 +95,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
   }, []);
 
   const isCardOrphaned = useCallback((card: Flashcard) => {
-    return card.document_id == null && (!card.topic || card.topic.trim() === '');
+  return card.document_id == null;
   }, []);
 
   const topicStatusMap = useMemo(() => {
