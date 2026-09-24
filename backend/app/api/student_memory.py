@@ -3,7 +3,8 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select, update
+# Added 'delete' to explicitly bypass ORM cascades
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/memory", tags=["Student Memory"])
 
 
 class ReviewRequest(BaseModel):
-    quality: int  # 0 to 5 SM-2 rating quality score
+    quality: int  
 
 
 class SnippetFlashcardRequest(BaseModel):
@@ -162,14 +163,27 @@ async def delete_flashcard(
     if not card:
         raise HTTPException(status_code=404, detail="Flashcard not found")
 
-    # Unbind associated review logs so heatmap activity is permanently preserved
+    # 1. Migrate legacy activity
+    if card.last_reviewed_at:
+        log_check = await db.execute(select(ReviewLog).where(ReviewLog.flashcard_id == card.id))
+        if not log_check.scalars().first():
+            db.add(ReviewLog(
+                user_id=current_user.id,
+                flashcard_id=None, 
+                quality=4, 
+                reviewed_at=card.last_reviewed_at
+            ))
+
+    # 2. Unbind associated review logs
     await db.execute(
         update(ReviewLog)
         .where(ReviewLog.flashcard_id == card_id)
         .values(flashcard_id=None)
     )
 
-    await db.delete(card)
+    # 3. FIX: Delete using Core execution to strictly bypass SQLAlchemy ORM Cascades
+    await db.execute(delete(Flashcard).where(Flashcard.id == card_id))
+    
     await db.commit()
     return {"message": "Flashcard deleted successfully, activity log preserved"}
 
@@ -198,14 +212,12 @@ async def review_flashcard(
 
     now = datetime.now(timezone.utc)
 
-    # 1. Update Flashcard SM-2 stats
     card.repetition_number = rep
     card.interval_days = interval
     card.ease_factor = ef
     card.next_review_at = next_review
     card.last_reviewed_at = now
 
-    # 2. Actively update User Study Streak based on UTC study actions
     today = now.date()
     if current_user.last_login_date != today:
         if current_user.last_login_date == today - timedelta(days=1):
@@ -214,7 +226,6 @@ async def review_flashcard(
             current_user.current_streak = 1
         current_user.last_login_date = today
 
-    # 3. Log review activity inside an isolated nested transaction
     try:
         async with db.begin_nested():
             review_entry = ReviewLog(
@@ -251,14 +262,32 @@ async def delete_orphaned_flashcards(
     )
     cards = (await db.execute(stmt)).scalars().all()
     count = len(cards)
+    
+    if count == 0:
+        return {"message": "No orphaned flashcards found", "count": 0}
+        
+    card_ids = [c.id for c in cards]
+
     for card in cards:
-        # Also preserve heatmap logs for bulk-deleted orphaned cards
-        await db.execute(
-            update(ReviewLog)
-            .where(ReviewLog.flashcard_id == card.id)
-            .values(flashcard_id=None)
-        )
-        await db.delete(card)
+        if card.last_reviewed_at:
+            log_check = await db.execute(select(ReviewLog).where(ReviewLog.flashcard_id == card.id))
+            if not log_check.scalars().first():
+                db.add(ReviewLog(
+                    user_id=current_user.id,
+                    flashcard_id=None,
+                    quality=4,
+                    reviewed_at=card.last_reviewed_at
+                ))
+
+    # Bulk unbind orphaned logs
+    await db.execute(
+        update(ReviewLog)
+        .where(ReviewLog.flashcard_id.in_(card_ids))
+        .values(flashcard_id=None)
+    )
+    
+    # Bulk delete using Core execution to bypass ORM Cascades
+    await db.execute(delete(Flashcard).where(Flashcard.id.in_(card_ids)))
         
     await db.commit()
     return {"message": f"Successfully deleted {count} orphaned flashcard(s)", "count": count}
