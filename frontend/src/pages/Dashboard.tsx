@@ -101,7 +101,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
         `}
       >
         <div className={`space-y-8 w-full overflow-hidden ${!isSidebarOpen ? 'md:flex md:flex-col md:items-center' : ''}`}>
-          <div className={`flex items-center w-full gap-2 ${!isSidebarOpen ? 'md:justify-center' : ''}`}>
+          <div className={`flex items-center w-full gap-2 cursor-default select-none ${!isSidebarOpen ? 'md:justify-center' : ''}`}>
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors cursor-pointer shrink-0"
@@ -115,7 +115,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
                 isSidebarOpen ? 'max-w-[200px] opacity-100 flex-1' : 'max-w-0 opacity-0'
               }`}
             >
-              <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center">
+              {/* Added pointer-events-none to the logo container */}
+              <div className="shrink-0 w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center pointer-events-none">
                 <img
                   src={logo}
                   alt="StudyVault AI Logo"
@@ -123,7 +124,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenProfile }) => {
                 />
               </div>
 
-              <div className="min-w-0 flex-1">
+              {/* Added pointer-events-none to the text container */}
+              <div className="min-w-0 flex-1 pointer-events-none">
                 <span className="font-bold text-[16px] tracking-tight truncate block text-slate-900 dark:text-slate-50">
                   StudyVault AI
                 </span>

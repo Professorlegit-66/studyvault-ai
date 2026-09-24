@@ -25,29 +25,84 @@ const DEFAULT_GREETING: Message = {
   text: 'Hello! I am your AI Tutor. Ask me any question about your uploaded documents, or select specific files above to focus our discussion.'
 };
 
+// Helper function to convert literal <br>, <br/>, or <br /> tags into actual React <br /> elements
+const parseBrTags = (content: React.ReactNode): React.ReactNode => {
+  if (typeof content === 'string') {
+    const parts = content.split(/<br\s*\/?>/gi);
+    if (parts.length === 1) return content;
+    return parts.map((part, i) => (
+      <React.Fragment key={i}>
+        {i > 0 && <br />}
+        {part}
+      </React.Fragment>
+    ));
+  }
+  if (Array.isArray(content)) {
+    return content.map((child, i) => <React.Fragment key={i}>{parseBrTags(child)}</React.Fragment>);
+  }
+  return content;
+};
+
+// Fixes multi-line text inside markdown table cells by joining them with <br />
+const fixMarkdownTables = (markdown: string): string => {
+  if (!markdown || typeof markdown !== 'string') return markdown;
+  const lines = markdown.split('\n');
+  let inTable = false;
+  const fixedLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      inTable = true;
+      fixedLines.push(line);
+    } else if (inTable && trimmed.startsWith('|')) {
+      fixedLines.push(line);
+    } else {
+      if (inTable) {
+        if (trimmed !== '' && !trimmed.startsWith('---') && !trimmed.startsWith('|')) {
+          if (fixedLines.length > 0) {
+            fixedLines[fixedLines.length - 1] = fixedLines[fixedLines.length - 1].replace(/\|$/, ' <br /> ' + trimmed + ' |');
+          } else {
+            fixedLines.push(line);
+            inTable = false;
+          }
+        } else {
+          inTable = false;
+          fixedLines.push(line);
+        }
+      } else {
+        fixedLines.push(line);
+      }
+    }
+  }
+  return fixedLines.join('\n');
+};
+
 const MARKDOWN_COMPONENTS = {
   h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold mt-4 mb-2 text-slate-900 dark:text-slate-100" {...props} />,
   h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold mt-4 mb-2 text-slate-900 dark:text-slate-100" {...props} />,
   h3: ({ node, ...props }: any) => (
     <h3 className="text-md font-bold mt-2 mb-1 text-indigo-600 dark:text-indigo-400" {...props} />
   ),
-  p: ({ node, ...props }: any) => <p className="mb-2 leading-relaxed text-slate-800 dark:text-slate-200" {...props} />,
+  p: ({ node, children, ...props }: any) => <p className="mb-2 leading-relaxed text-slate-800 dark:text-slate-200" {...props}>{parseBrTags(children)}</p>,
   ul: ({ node, ...props }: any) => <ul className="list-disc pl-5 space-y-1 mb-2 text-slate-800 dark:text-slate-200" {...props} />,
   ol: ({ node, ...props }: any) => <ol className="list-decimal pl-5 space-y-1 mb-2 text-slate-800 dark:text-slate-200" {...props} />,
-  li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
+  li: ({ node, children, ...props }: any) => <li className="pl-1" {...props}>{parseBrTags(children)}</li>,
   strong: ({ node, ...props }: any) => (
     <strong className="font-bold text-slate-900 dark:text-slate-100" {...props} />
   ),
   table: ({ node, ...props }: any) => (
-    <div className="overflow-x-auto my-3 border border-slate-200 dark:border-slate-700 rounded-xl">
-      <table className="w-full text-left border-collapse text-xs" {...props} />
+    <div className="overflow-x-auto my-3 border border-slate-200 dark:border-slate-700 rounded-xl custom-scrollbar">
+      <table className="w-full text-left border-collapse text-xs table-fixed" {...props} />
     </div>
   ),
   thead: ({ node, ...props }: any) => <thead className="bg-slate-100 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300" {...props} />,
   tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-slate-200 dark:divide-slate-700" {...props} />,
   tr: ({ node, ...props }: any) => <tr className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-900/30" {...props} />,
-  th: ({ node, ...props }: any) => <th className="px-3 py-2 font-bold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700" {...props} />,
-  td: ({ node, ...props }: any) => <td className="px-3 py-2 text-slate-700 dark:text-slate-300" {...props} />,
+  th: ({ node, children, ...props }: any) => <th className="px-4 py-3 font-bold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700 whitespace-normal break-words" {...props}>{parseBrTags(children)}</th>,
+  td: ({ node, children, ...props }: any) => <td className="px-4 py-3 text-slate-700 dark:text-slate-300 align-top whitespace-normal break-words" {...props}>{parseBrTags(children)}</td>,
   code: ({ node, inline, ...props }: any) =>
     inline ? (
       <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[13px] text-pink-600 dark:text-pink-400 font-mono" {...props} />
@@ -88,7 +143,11 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     try {
       const res = await apiClient.get<Message[]>('/rag/history');
       if (Array.isArray(res.data) && res.data.length > 0) {
-        setMessages(res.data);
+        const sanitized = res.data.map((m) => ({
+          ...m,
+          text: fixMarkdownTables(m.text),
+        }));
+        setMessages(sanitized);
       } else {
         setMessages([DEFAULT_GREETING]);
       }
@@ -194,12 +253,14 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
       }
 
       const response = await apiClient.post('/rag/chat', payload);
+      const fixedAnswer = fixMarkdownTables(response.data.answer);
+
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
           sender: 'ai',
-          text: response.data.answer,
+          text: fixedAnswer,
           sources: response.data.sources,
         },
       ]);
@@ -226,7 +287,6 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
     const index = messages.findIndex((m, idx) => (m.id ?? `msg-${idx}`) === msgId);
     if (index === -1) return;
 
-    // Truncate history up to this edited message and send the new text
     const truncated = messages.slice(0, index);
     setMessages(truncated);
     await handleSend(undefined, newText);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { Copy, Check, Edit2, X, Send, Bot, User, BookOpen } from 'lucide-react';
 
 interface Message {
@@ -39,19 +40,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onResubmi
     }
   };
 
-  // Intercept and merge custom table styling to force horizontal scrolling and balanced columns
+  // Intercept and merge custom table styling. Previously forced a fixed
+  // min-width on the table (800px) AND on every th/td (150px each) - that
+  // combination guaranteed overflow for any table with more than ~2
+  // columns, regardless of the chat bubble's actual width, which is what
+  // caused tables to get cropped and require horizontal scrolling even
+  // for normal-sized content. table-fixed + no forced min-widths lets
+  // columns share the available width and wrap text instead.
   const mergedComponents = {
     ...markdownComponents,
     table: ({ node, ...props }: any) => (
       <div className="not-prose w-full overflow-x-auto my-4 rounded-xl border border-slate-200 dark:border-slate-700 custom-scrollbar shadow-sm">
-        <table className="w-full text-left border-collapse text-sm min-w-[800px]" {...props} />
+        <table className="w-full text-left border-collapse text-sm table-auto" {...props} />
       </div>
     ),
     th: ({ node, ...props }: any) => (
-      <th className="bg-slate-100 dark:bg-slate-800/80 p-4 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-slate-100 min-w-[150px]" {...props} />
+      <th className="bg-slate-100 dark:bg-slate-800/80 p-4 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-slate-100 whitespace-normal break-words" {...props} />
     ),
     td: ({ node, ...props }: any) => (
-      <td className="p-4 border-b border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 align-top min-w-[150px] leading-relaxed" {...props} />
+      <td className="p-4 border-b border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 align-top leading-relaxed whitespace-normal break-words" {...props} />
     ),
   };
 
@@ -105,7 +112,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onResubmi
                  <span className="whitespace-pre-wrap break-words">{rawText}</span>
               ) : (
                  <div className="prose prose-invert max-w-none prose-sm overflow-hidden">
-                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={mergedComponents}>
+                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={mergedComponents}>
                      {rawText}
                    </ReactMarkdown>
                  </div>
