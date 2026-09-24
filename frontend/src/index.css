@@ -16,6 +16,9 @@
     transition-property: background-color;
     transition-duration: 300ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Force the standard arrow cursor instead of the text I-beam in empty spaces */
+    cursor: default;
   }
 
   html {
@@ -25,9 +28,19 @@
     color-scheme: dark;
   }
 
-  /* Hide the text cursor (caret) on general UI text while keeping text copyable */
+  /* Hide the blinking text caret on general UI text while keeping text copyable */
   p, span, h1, h2, h3, h4, h5, h6, label {
     caret-color: transparent;
+  }
+
+  /* Prevent text I-beam cursor and highlighting on structural UI elements (logos, headings, icons) */
+  img, h1, h2, h3, h4, h5, h6, button, svg {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  button {
+    cursor: pointer;
   }
 }
 

@@ -4,7 +4,7 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
   themeMode: ThemeMode;
-  isDarkMode: boolean; // the resolved, currently-applied appearance (system resolves to light/dark)
+  isDarkMode: boolean;
   setThemeMode: (mode: ThemeMode) => void;
 }
 
@@ -17,40 +17,49 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('theme');
     if (saved === 'dark' || saved === 'light' || saved === 'system') return saved;
-    return 'system'; // Default to following the OS setting rather than
-                      // hardcoding light, unless the user has explicitly
-                      // chosen one before.
+    
+    // IF YOU WANT THE APP TO ALWAYS DEFAULT TO LIGHT MODE FOR NEW USERS:
+    // Change 'system' to 'light' below.
+    return 'light'; 
   });
 
-  const [isDarkMode, setIsDarkMode] = useState(() =>
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() =>
     themeMode === 'system' ? getSystemPrefersDark() : themeMode === 'dark'
   );
 
-  // Applies the resolved appearance to <html>. Recomputes on every
-  // themeMode change, and - only while in 'system' mode - also listens for
-  // the OS's own color-scheme preference changing live (e.g. the OS
-  // auto-switches to dark mode at sunset while this tab stays open).
+  // 1. Handle DOM updates and System Theme listening
   useEffect(() => {
     const root = document.documentElement;
 
-    const applyResolvedTheme = () => {
-      const resolvedDark = themeMode === 'system' ? getSystemPrefersDark() : themeMode === 'dark';
-      setIsDarkMode(resolvedDark);
-      if (resolvedDark) {
+    const applyTheme = (isDark: boolean) => {
+      setIsDarkMode(isDark);
+      if (isDark) {
         root.classList.add('dark');
       } else {
         root.classList.remove('dark');
       }
     };
 
-    applyResolvedTheme();
-    localStorage.setItem('theme', themeMode);
-
     if (themeMode === 'system') {
       const mql = window.matchMedia('(prefers-color-scheme: dark)');
-      mql.addEventListener('change', applyResolvedTheme);
-      return () => mql.removeEventListener('change', applyResolvedTheme);
+      
+      // Apply immediately based on current system state
+      applyTheme(mql.matches);
+
+      // Listen for OS theme changes while the app is open
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
+      mql.addEventListener('change', handler);
+      
+      return () => mql.removeEventListener('change', handler);
+    } else {
+      // Apply the manual override (light or dark)
+      applyTheme(themeMode === 'dark');
     }
+  }, [themeMode]);
+
+  // 2. Keep localStorage sync separate and clean
+  useEffect(() => {
+    localStorage.setItem('theme', themeMode);
   }, [themeMode]);
 
   const setThemeMode = useCallback((mode: ThemeMode) => {

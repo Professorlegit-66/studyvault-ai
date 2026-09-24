@@ -4,8 +4,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { UserProfileModal } from './components/UserProfileModal';
 import { apiClient } from './api/client';
-import { BookOpen, KeyRound, Mail, User, Loader2, AlertCircle, ShieldCheck, RotateCw } from 'lucide-react';
+import { KeyRound, Mail, User, Loader2, AlertCircle, ShieldCheck, RotateCw } from 'lucide-react';
 import { ThemeToggle } from './components/ThemeToggle';
+
+import logoImg from './assets/studyvault-logo.png';
 
 const AuthScreenContent: React.FC = () => {
   const { login } = useAuth();
@@ -158,7 +160,8 @@ const AuthScreenContent: React.FC = () => {
         <div className="absolute top-6 right-6">
           <ThemeToggle />
         </div>
-        <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300">
+        {/* Added cursor-default to the main card wrapper */}
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300 cursor-default select-none">
           <div className="flex flex-col items-center mb-6">
             <div className="p-2.5 bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 rounded-xl mb-3">
               <ShieldCheck className="w-6 h-6" />
@@ -190,7 +193,7 @@ const AuthScreenContent: React.FC = () => {
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-center text-lg tracking-[0.3em] text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-center text-lg tracking-[0.3em] text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 cursor-text"
             />
 
             <button
@@ -234,12 +237,20 @@ const AuthScreenContent: React.FC = () => {
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <div className="p-2.5 bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 rounded-xl">
-            <BookOpen className="w-6 h-6" />
+      {/* Added cursor-default here */}
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300 cursor-default select-none">
+        
+        <div className="flex items-center justify-center gap-4 mb-8 cursor-default select-none">
+          <div className="w-[58px] h-16 overflow-hidden shrink-0 flex items-center justify-start pointer-events-none">
+            <img 
+              src={logoImg} 
+              alt="StudyVault AI Logo" 
+              className="h-full w-auto max-w-none object-cover object-left scale-[1.15] origin-left" 
+            />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">StudyVault AI</h1>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight pointer-events-none">
+            StudyVault AI
+          </h1>
         </div>
 
         <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 text-center mb-6">
@@ -259,42 +270,46 @@ const AuthScreenContent: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Added cursor-default to the form wrapper */}
+        <form onSubmit={handleSubmit} className="space-y-4 cursor-default">
           {!isLogin && (
             <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              {/* Added pointer-events-none to the icon */}
+              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Full Name"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 cursor-text"
               />
             </div>
           )}
 
           <div className="relative">
-            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            {/* Added pointer-events-none to the icon */}
+            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="email"
               placeholder="Email address"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 cursor-text"
             />
           </div>
 
           <div className="relative">
-            <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            {/* Added pointer-events-none to the icon */}
+            <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="password"
               placeholder="Password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 cursor-text"
             />
           </div>
 
@@ -335,7 +350,7 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center text-slate-900 dark:text-slate-100 gap-3">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center text-slate-900 dark:text-slate-100 gap-3 cursor-default">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
         {isSlowConnection && (
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center px-6">
@@ -367,7 +382,7 @@ export const App: React.FC = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
-        {/* Global Scrollbar Styles for sleek, theme-aware webkit scrollbars */}
+        {/* Global Scrollbar Styles */}
         <style>{`
           .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
