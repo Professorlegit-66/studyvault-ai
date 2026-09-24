@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api/client';
-import { Sparkles, Plus, Trash2, Send, Brain, X, MessageCircle } from 'lucide-react';
+import { Sparkles, Plus, Trash2, Send, Brain, X, MessageCircle, Bot, Loader2 } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 
 interface Conversation {
@@ -368,9 +368,13 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
                 />
               ))}
               {isSending && (
-                <div className="flex justify-start">
-                  <div className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-900 text-slate-400">
-                    Thinking...
+                <div className="flex gap-3 justify-start items-center text-slate-500 dark:text-slate-400 text-xs">
+                  <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                    <Loader2 className="w-4 h-4 animate-spin text-indigo-600 dark:text-indigo-400" />
+                    <span>Recalling memories & thinking...</span>
                   </div>
                 </div>
               )}
@@ -384,7 +388,7 @@ export const AICompanion: React.FC<AICompanionProps> = ({ isActive = true }) => 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message your AI Companion..."
+            placeholder="Ask me anything or tell me something to remember..."
             rows={1}
             className="flex-1 resize-none bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
           />

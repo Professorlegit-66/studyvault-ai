@@ -456,7 +456,7 @@ export const AITutorChat: React.FC<AITutorChatProps> = ({
             </div>
             <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700/80">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-600 dark:text-indigo-400" />
-              <span>Generating response from context...</span>
+              <span>Searching vault documents & generating response...</span>
             </div>
           </div>
         )}

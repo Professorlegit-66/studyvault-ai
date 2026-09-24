@@ -1,7 +1,7 @@
 // File: frontend/src/components/HelpAssistant.tsx
 
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Trash2, Copy, Check, Edit2, Send, Bot, User } from 'lucide-react';
+import { MessageCircle, X, Trash2, Copy, Check, Edit2, Send, Bot, User, Loader2 } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 interface HelpMessage {
@@ -277,12 +277,13 @@ export default function HelpAssistant() {
             })}
 
             {isLoading && (
-              <div className="flex gap-2 justify-start items-center text-slate-400 text-xs">
-                <div className="p-1.5 bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 rounded-lg">
+              <div className="flex gap-2 justify-start items-center text-slate-500 dark:text-slate-400 text-xs">
+                <div className="p-1.5 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit shrink-0 mt-1">
                   <Bot className="w-3.5 h-3.5" />
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl">
-                  Thinking...
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-slate-100">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
+                  <span>Looking up app features & guidance...</span>
                 </div>
               </div>
             )}
@@ -295,7 +296,7 @@ export default function HelpAssistant() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask how to do something..."
+              placeholder="Ask how to use any feature..."
               className="flex-1 min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
