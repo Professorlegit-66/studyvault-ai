@@ -28,8 +28,8 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ isActive, userName, 
   const [streakDays, setStreakDays] = useState<number | null>(null);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [totalContributions, setTotalContributions] = useState<number>(0);
-  // Use UTC year consistently — the backend buckets everything by UTC date
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getUTCFullYear());
+  const [hoveredDay, setHoveredDay] = useState<HeatmapDay | null>(null);
 
   const availableYears = [2026, 2025];
 
@@ -137,6 +137,11 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ isActive, userName, 
       }
     }
   });
+
+  // Calculate today's reviews to show as the default text when not hovering
+  const now = new Date();
+  const todayDateStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+  const todayCount = heatmapData.find(d => d.date === todayDateStr)?.count || 0;
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -263,6 +268,8 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ isActive, userName, 
                         key={dayIdx}
                         className={`w-3 h-3 rounded-[3px] transition-transform hover:scale-125 cursor-pointer ${getHeatmapColor(day.count)}`}
                         title={`${day.date}: ${day.count} review(s)`}
+                        onMouseEnter={() => setHoveredDay(day)}
+                        onMouseLeave={() => setHoveredDay(null)}
                       />
                     ))}
                   </div>
@@ -272,8 +279,12 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ isActive, userName, 
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
-          <span className="text-[11px]">{totalContributions} total review actions recorded</span>
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5 min-h-[24px]">
+          <span className="text-[11px] font-medium transition-all duration-200">
+            {hoveredDay 
+              ? `${hoveredDay.count} review${hoveredDay.count === 1 ? '' : 's'} on ${hoveredDay.date}`
+              : `${todayCount} review${todayCount === 1 ? '' : 's'} today`}
+          </span>
           <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/60 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px]">
             <span>Less</span>
             <div className="flex items-center gap-1">
