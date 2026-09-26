@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Dashboard } from './pages/Dashboard';
@@ -7,7 +7,7 @@ import { apiClient } from './api/client';
 import { KeyRound, Mail, User, Loader2, AlertCircle, ShieldCheck, RotateCw } from 'lucide-react';
 import { ThemeToggle } from './components/ThemeToggle';
 
-import logoImg from './assets/studyvault-logo.png';
+import logoImg from './assets/studyvault-main-logo.png';
 
 const AuthScreenContent: React.FC = () => {
   const { login } = useAuth();
@@ -36,7 +36,7 @@ const AuthScreenContent: React.FC = () => {
       setResending(true);
       try {
         await apiClient.post('/auth/resend-verification', { email: targetEmail });
-        setSuccess('Looks like your last registration didn\u2019t finish. We\u2019ve sent a fresh code to your email.');
+        setSuccess("Looks like your last registration didn’t finish. We’ve sent a fresh code to your email.");
       } catch (err: any) {
         const detail = err.response?.data?.detail;
         setError(typeof detail === 'string' ? detail : 'Could not automatically resend a code - use the resend button below.');
@@ -160,7 +160,6 @@ const AuthScreenContent: React.FC = () => {
         <div className="absolute top-6 right-6">
           <ThemeToggle />
         </div>
-        {/* Added cursor-default to the main card wrapper */}
         <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300 cursor-default select-none">
           <div className="flex flex-col items-center mb-6">
             <div className="p-2.5 bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 rounded-xl mb-3">
@@ -237,15 +236,18 @@ const AuthScreenContent: React.FC = () => {
         <ThemeToggle />
       </div>
 
-      {/* Added cursor-default here */}
       <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl transition-colors duration-300 cursor-default select-none">
         
-        <div className="flex items-center justify-center gap-4 mb-8 cursor-default select-none">
-          <div className="w-[58px] h-16 overflow-hidden shrink-0 flex items-center justify-start pointer-events-none">
+        <div className="flex items-center justify-center gap-3 mb-8 cursor-default select-none">
+          <div className="shrink-0 w-12 h-12 flex items-center justify-center pointer-events-none select-none">
             <img 
               src={logoImg} 
               alt="StudyVault AI Logo" 
-              className="h-full w-auto max-w-none object-cover object-left scale-[1.15] origin-left" 
+              className="w-full h-full object-contain filter drop-shadow-[0_0_10px_rgba(59,130,246,0.6)]" 
+              style={{
+                WebkitMaskImage: 'radial-gradient(circle, black 52%, transparent 80%)',
+                maskImage: 'radial-gradient(circle, black 52%, transparent 80%)',
+              }}
             />
           </div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight pointer-events-none">
@@ -270,11 +272,9 @@ const AuthScreenContent: React.FC = () => {
           </div>
         )}
 
-        {/* Added cursor-default to the form wrapper */}
         <form onSubmit={handleSubmit} className="space-y-4 cursor-default">
           {!isLogin && (
             <div className="relative">
-              {/* Added pointer-events-none to the icon */}
               <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -288,7 +288,6 @@ const AuthScreenContent: React.FC = () => {
           )}
 
           <div className="relative">
-            {/* Added pointer-events-none to the icon */}
             <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="email"
@@ -301,7 +300,6 @@ const AuthScreenContent: React.FC = () => {
           </div>
 
           <div className="relative">
-            {/* Added pointer-events-none to the icon */}
             <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="password"
@@ -347,6 +345,24 @@ const AuthScreenContent: React.FC = () => {
 const AppContent: React.FC = () => {
   const { user, isLoading, isSlowConnection } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Automatically adjust application scale based on system display & window size for perfect proportions
+  useEffect(() => {
+    const updateAppScale = () => {
+      const height = window.innerHeight;
+      const width = window.innerWidth;
+      
+      let scale = height / 900; 
+      if (width < 1200) scale = width / 1440;
+      
+      const clampedScale = Math.min(Math.max(scale, 0.78), 1);
+      document.documentElement.style.fontSize = `${clampedScale * 100}%`;
+    };
+
+    updateAppScale();
+    window.addEventListener('resize', updateAppScale);
+    return () => window.removeEventListener('resize', updateAppScale);
+  }, []);
 
   if (isLoading) {
     return (

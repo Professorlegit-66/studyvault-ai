@@ -1,26 +1,11 @@
+// File: frontend/src/components/StudentMemory.tsx
+
+import memoryIcon from '../assets/memory-tab-icon.png';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { apiClient } from '../api/client';
-import {
-  Brain,
-  Sparkles,
-  CheckCircle,
-  RotateCw,
-  RefreshCw,
-  Clock,
-  Keyboard,
-  Plus,
-  X,
-  Search,
-  Filter,
-  Download,
-  Trash2,
-  FileX,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  Check,
-  Layers
-} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Sparkles, CheckCircle, RotateCw, RefreshCw, Clock, Keyboard, Plus, X, Search, Filter, Download, Trash2, FileX, AlertTriangle, ChevronDown, ChevronUp, Check, Layers } from 'lucide-react';
 
 interface Flashcard {
   id: number;
@@ -44,14 +29,10 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
-
-  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('all');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Modals State
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showSnippetModal, setShowSnippetModal] = useState(false);
   const [snippetTitle, setSnippetTitle] = useState('');
@@ -75,18 +56,12 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
   };
 
   useEffect(() => {
-    if (isActive) {
-      fetchCards();
-    }
+    if (isActive) fetchCards();
   }, [isActive]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsDropdownOpen(false);
       }
     };
@@ -95,7 +70,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
   }, []);
 
   const isCardOrphaned = useCallback((card: Flashcard) => {
-  return card.document_id == null;
+    return card.document_id == null;
   }, []);
 
   const topicStatusMap = useMemo(() => {
@@ -123,31 +98,22 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
 
   const filteredCards = useMemo(() => {
     return flashcards.filter((card) => {
-      const matchesSearch =
-        card.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        card.answer?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesTopic =
-        selectedTopic === 'all' || card.topic === selectedTopic;
+      const matchesSearch = card.question?.toLowerCase().includes(searchQuery.toLowerCase()) || card.answer?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesTopic = selectedTopic === 'all' || card.topic === selectedTopic;
       return matchesSearch && matchesTopic;
     });
   }, [flashcards, searchQuery, selectedTopic]);
 
   const currentCard = filteredCards[currentIndex];
-  const hasOrphanedCards = useMemo(
-    () => flashcards.some(isCardOrphaned),
-    [flashcards, isCardOrphaned]
-  );
+  const hasOrphanedCards = useMemo(() => flashcards.some(isCardOrphaned), [flashcards, isCardOrphaned]);
 
-  const handleReview = useCallback(
-    async (quality: number) => {
+  const handleReview = useCallback(async (quality: number) => {
       if (!currentCard || submitting) return;
-
       setSubmitting(true);
       try {
         await apiClient.post(`/memory/review/${currentCard.id}`, { quality });
         setIsFlipped(false);
         setReviewedCount((prev) => prev + 1);
-
         if (currentIndex < filteredCards.length - 1) {
           setCurrentIndex((prev) => prev + 1);
         } else {
@@ -159,8 +125,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
       } finally {
         setSubmitting(false);
       }
-    },
-    [currentCard, currentIndex, filteredCards.length, submitting]
+    }, [currentCard, currentIndex, filteredCards.length, submitting]
   );
 
   const handleDeleteCard = async (cardId: number) => {
@@ -170,7 +135,6 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
       } catch {
         await apiClient.delete(`/memory/${cardId}`);
       }
-
       setIsFlipped(false);
       const updated = flashcards.filter((c) => c.id !== cardId);
       setFlashcards(updated);
@@ -195,9 +159,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
 
   const exportFlashcardsJSON = () => {
     if (filteredCards.length === 0) return;
-    const dataStr =
-      'data:text/json;charset=utf-8,' +
-      encodeURIComponent(JSON.stringify(filteredCards, null, 2));
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(filteredCards, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
     downloadAnchor.setAttribute('download', 'studyvault_flashcards.json');
@@ -209,7 +171,6 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
   const handleGenerateSnippetCard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!snippetTitle.trim() || !snippetText.trim()) return;
-
     setIsGenerating(true);
     try {
       await apiClient.post('/memory/generate-from-snippet', {
@@ -227,53 +188,43 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
     }
   };
 
-  // Keyboard shortcuts handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        showSnippetModal ||
-        showClearConfirm ||
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(
-          (e.target as HTMLElement)?.tagName
-        )
-      ) {
-        return;
-      }
-
+      if (showSnippetModal || showClearConfirm || ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
       if (e.code === 'Space' || e.key === 'Enter') {
         e.preventDefault();
         setIsFlipped((prev) => !prev);
       } else if (isFlipped && !submitting) {
-        if (e.key === '1') handleReview(1);      // Again
-        else if (e.key === '2') handleReview(3); // Hard
-        else if (e.key === '3') handleReview(4); // Good
-        else if (e.key === '4') handleReview(5); // Easy
+        if (e.key === '1') handleReview(1);      
+        else if (e.key === '2') handleReview(3); 
+        else if (e.key === '3') handleReview(4); 
+        else if (e.key === '4') handleReview(5); 
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFlipped, handleReview, showSnippetModal, showClearConfirm, submitting]);
 
-  const progressPercent =
-    flashcards.length > 0
-      ? Math.min(100, (reviewedCount / (reviewedCount + flashcards.length)) * 100)
-      : 0;
+  const progressPercent = flashcards.length > 0 ? Math.min(100, (reviewedCount / (reviewedCount + flashcards.length)) * 100) : 0;
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-3.5 animate-fadeIn pb-2 antialiased px-2 sm:px-4">
-      {/* Header & Global Toolbar */}
-      <div className="w-full flex items-center justify-between flex-nowrap gap-4">
-        <div className="min-w-0 shrink">
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2.5 whitespace-nowrap">
-            <Brain className="w-6 h-6 text-indigo-500 shrink-0" /> Spaced Repetition Review
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+    <div className="w-full space-y-6 pb-2 antialiased">
+      <div className="flex flex-wrap items-center justify-between gap-4 shrink-0 w-full select-none pointer-events-none">
+        <div className="flex flex-col gap-1 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg overflow-hidden bg-[#071d49] shadow-[0_0_10px_rgba(99,102,241,0.4)] dark:shadow-[0_0_10px_rgba(255,255,255,0.25)] flex items-center justify-center">
+              <img src={memoryIcon} alt="Student Memory" className="w-full h-full object-cover scale-[1.25]" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
+              Spaced Repetition Review
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             Review your cards to strengthen active recall retention.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-nowrap shrink-0 ml-auto">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 ml-auto pointer-events-auto">
           {hasOrphanedCards && (
             <button
               onClick={() => setShowClearConfirm(true)}
@@ -287,7 +238,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
 
           <button
             onClick={() => fetchCards()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer whitespace-nowrap shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-200 dark:border-slate-800 cursor-pointer whitespace-nowrap shrink-0"
             title="Refresh Queue"
           >
             <RefreshCw className="w-3.5 h-3.5 text-indigo-500" />
@@ -297,7 +248,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
           {filteredCards.length > 0 && (
             <button
               onClick={exportFlashcardsJSON}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors border border-slate-200 dark:border-slate-800 cursor-pointer whitespace-nowrap shrink-0"
             >
               <Download className="w-3.5 h-3.5 text-indigo-500" />
               <span>Export Flashcards</span>
@@ -314,9 +265,8 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
         </div>
       </div>
 
-      {/* Search & Topic Filter Bar */}
       {flashcards.length > 0 && (
-        <div className="w-full bg-white dark:bg-slate-800/80 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs flex items-center gap-3 flex-wrap sm:flex-nowrap">
+        <div className="w-full bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-3 flex-wrap sm:flex-nowrap">
           <div className="relative flex-1 min-w-[240px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -327,7 +277,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
                 setSearchQuery(e.target.value);
                 setCurrentIndex(0);
               }}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-500 transition-colors"
             />
           </div>
 
@@ -335,7 +285,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
             <button
               type="button"
               onClick={() => setIsDropdownOpen((prev) => !prev)}
-              className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between transition-all cursor-pointer hover:border-indigo-500/50"
+              className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between transition-all cursor-pointer hover:border-indigo-500/50"
             >
               <div className="flex items-center gap-2 truncate">
                 <Filter className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
@@ -353,7 +303,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
             </button>
 
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-full z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-1.5 shadow-2xl space-y-1 animate-fadeIn">
+              <div className="absolute right-0 mt-2 w-full z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1.5 shadow-2xl space-y-1 animate-fadeIn">
                 <button
                   type="button"
                   onClick={() => {
@@ -398,16 +348,15 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
         </div>
       )}
 
-      {/* Main Flashcard Container */}
       {loading ? (
-        <div className="w-full bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700/80 p-12 text-center space-y-3 shadow-xs">
+        <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center space-y-3 shadow-xs">
           <RotateCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
           <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
             Loading your memory queue...
           </p>
         </div>
       ) : filteredCards.length === 0 ? (
-        <div className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center space-y-4 shadow-xs">
+        <div className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center space-y-4 shadow-xs">
           <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle className="w-6 h-6" />
           </div>
@@ -432,15 +381,15 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
         </div>
       ) : (
         <div className="w-full space-y-3">
-          <div className="w-full bg-white dark:bg-slate-800/60 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-xs flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400">
+          <div className="w-full bg-white dark:bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-indigo-500" /> Card {currentIndex + 1} of {filteredCards.length}
             </span>
             <span>{Math.round(progressPercent)}% Session Progress</span>
           </div>
 
-          <div className="w-full bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/90 rounded-2xl p-4 sm:p-6 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between flex-wrap gap-2 text-xs border-b border-slate-100 dark:border-slate-700 pb-3">
+          <div className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between flex-wrap gap-2 text-xs border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-3">
                 <span className="font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   CARD {currentIndex + 1} OF {filteredCards.length}
@@ -469,7 +418,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
 
                 {isCardOrphaned(currentCard) && (
                   <span
-                    className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full text-[11px] font-medium"
+                    className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full text-[11px] font-medium"
                     title="The original document for this card has been removed, but your review progress is kept."
                   >
                     <FileX className="w-3 h-3 text-slate-500 dark:text-slate-400" />
@@ -479,7 +428,6 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
               </div>
             </div>
 
-            {/* FLIP CARD CONTAINER (Using CSS Grid instead of fixed absolute positioning) */}
             <div
               onClick={() => setIsFlipped(!isFlipped)}
               className="relative w-full cursor-pointer group shrink-0"
@@ -492,25 +440,23 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
                   transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
                 }}
               >
-                {/* Front Side */}
                 <div
-                  className="col-start-1 row-start-1 w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 sm:p-6 flex flex-col items-center text-center min-h-[250px] max-h-[65vh]"
+                  className="col-start-1 row-start-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-6 flex flex-col items-center text-center min-h-[250px] max-h-[65vh]"
                   style={{
                     backfaceVisibility: 'hidden',
                     WebkitBackfaceVisibility: 'hidden',
-                    transform: 'translateZ(1px)' // Prevents rendering glitches
+                    transform: 'translateZ(1px)'
                   }}
                 >
                   <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-600 dark:text-indigo-400 mb-4 shrink-0">
                     QUESTION (CLICK TO FLIP)
                   </span>
                   
-                  {/* WRAPPED QUESTION CONTAINER - Centers short text, scrolls long text */}
-                  <div className="flex-1 w-full overflow-y-auto break-words whitespace-pre-wrap px-2 sm:px-4 text-center custom-scrollbar flex flex-col">
-                    <div className="m-auto w-full">
-                      <p className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 leading-relaxed max-w-4xl mx-auto py-2">
+                  <div className="flex-1 w-full overflow-y-auto break-words px-2 sm:px-4 text-center custom-scrollbar flex flex-col">
+                    <div className="m-auto w-full prose dark:prose-invert max-w-none text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 leading-relaxed">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {currentCard.question}
-                      </p>
+                      </ReactMarkdown>
                     </div>
                   </div>
 
@@ -523,9 +469,8 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
                   </p>
                 </div>
 
-                {/* Back Side */}
                 <div
-                  className="col-start-1 row-start-1 w-full bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 sm:p-6 flex flex-col items-center text-center min-h-[250px] max-h-[65vh]"
+                  className="col-start-1 row-start-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-6 flex flex-col items-center text-center min-h-[250px] max-h-[65vh]"
                   style={{
                     backfaceVisibility: 'hidden',
                     WebkitBackfaceVisibility: 'hidden',
@@ -536,12 +481,11 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
                     ANSWER
                   </span>
                   
-                  {/* WRAPPED ANSWER CONTAINER - Centers short text, scrolls long text */}
-                  <div className="flex-1 w-full overflow-y-auto break-words whitespace-pre-wrap px-2 sm:px-4 text-center custom-scrollbar flex flex-col">
-                    <div className="m-auto w-full">
-                      <p className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 leading-relaxed max-w-4xl mx-auto py-2">
+                  <div className="flex-1 w-full overflow-y-auto break-words px-2 sm:px-4 text-center custom-scrollbar flex flex-col">
+                    <div className="m-auto w-full prose dark:prose-invert max-w-none text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 leading-relaxed">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {currentCard.answer}
-                      </p>
+                      </ReactMarkdown>
                     </div>
                   </div>
 
@@ -552,7 +496,6 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
               </div>
             </div>
 
-            {/* Rating Action Buttons */}
             {isFlipped ? (
               <div className="space-y-2 pt-1 shrink-0">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -634,7 +577,6 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
         </div>
       )}
 
-      {/* Confirmation Modal */}
       {showClearConfirm && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 animate-scaleUp">
@@ -675,11 +617,10 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
         </div>
       )}
 
-      {/* Snippet Card Generation Modal */}
       {showSnippetModal && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl animate-scaleUp">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl animate-scaleUp">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-indigo-500" /> Generate Card from Snippet
               </h3>
@@ -702,7 +643,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
                   placeholder="e.g., Computer Architecture - Cache Memory"
                   value={snippetTitle}
                   onChange={(e) => setSnippetTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 transition-colors"
                 />
               </div>
 
@@ -716,7 +657,7 @@ export const StudentMemory: React.FC<StudentMemoryProps> = ({ isActive = true })
                   placeholder="Paste lecture notes, definitions, or textbook paragraphs here..."
                   value={snippetText}
                   onChange={(e) => setSnippetText(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 resize-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 resize-none transition-colors"
                 />
               </div>
 

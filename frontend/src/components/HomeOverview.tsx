@@ -1,6 +1,14 @@
+// File: frontend/src/components/HomeOverview.tsx
+
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { Brain, FileText, ArrowRight, Flame, Activity, Clock, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowRight, Clock, Calendar as CalendarIcon } from 'lucide-react';
+
+// Importing the separate icons directly from your assets folder
+import vaultIcon from '../assets/vault-icon.png';
+import memoryIcon from '../assets/memory-icon.png';
+import streakIcon from '../assets/streak-icon.png';
+import retentionIcon from '../assets/retension-icon.png';
 
 interface HomeOverviewProps {
   isActive: boolean;
@@ -138,7 +146,6 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ isActive, userName, 
     }
   });
 
-  // Calculate today's reviews to show as the default text when not hovering
   const now = new Date();
   const todayDateStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
   const todayCount = heatmapData.find(d => d.date === todayDateStr)?.count || 0;
@@ -155,44 +162,70 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({ isActive, userName, 
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-xl space-y-2">
-          <div className="flex items-center justify-between text-indigo-500">
-            <FileText className="w-5 h-5" />
-            <span className="text-xs font-semibold px-2 py-0.5 bg-indigo-500/10 rounded-full">Vault</span>
+        {/* Card 1: Uploaded Documents */}
+        <div 
+          onClick={() => onNavigate('documents')}
+          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-xl hover:border-indigo-500/50 transition-all cursor-pointer group flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-[#071d49] shadow-[0_0_14px_rgba(99,102,241,0.4)] dark:shadow-[0_0_14px_rgba(255,255,255,0.25)] transition-all group-hover:scale-105">
+              <img src={vaultIcon} alt="Vault" className="w-full h-full object-cover scale-[1.25]" />
+            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full">Vault</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{documentCount}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Uploaded Documents</p>
+          <div>
+            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{documentCount}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Uploaded Documents</p>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-xl space-y-2">
-          <div className="flex items-center justify-between text-emerald-500">
-            <Brain className="w-5 h-5" />
-            <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-500/10 rounded-full">Memory</span>
+        {/* Card 2: Cards Due for Review */}
+        <div 
+          onClick={() => onNavigate('memory')}
+          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-xl hover:border-indigo-500/50 transition-all cursor-pointer group flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-[#071d49] shadow-[0_0_14px_rgba(16,185,129,0.4)] dark:shadow-[0_0_14px_rgba(255,255,255,0.25)] transition-all group-hover:scale-105">
+              <img src={memoryIcon} alt="Memory" className="w-full h-full object-cover scale-[1.25]" />
+            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full">Memory</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{cardCount}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Cards Due for Review</p>
+          <div>
+            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{cardCount}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Cards Due for Review</p>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-xl space-y-2">
-          <div className="flex items-center justify-between text-amber-500">
-            <Flame className="w-5 h-5" />
-            <span className="text-xs font-semibold px-2 py-0.5 bg-amber-500/10 rounded-full">Streak</span>
+        {/* Card 3: Active Study Streak */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-xl flex flex-col justify-between group">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-[#071d49] shadow-[0_0_14px_rgba(245,158,11,0.4)] dark:shadow-[0_0_14px_rgba(255,255,255,0.25)] transition-all group-hover:scale-105">
+              <img src={streakIcon} alt="Streak" className="w-full h-full object-cover scale-[1.25]" />
+            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full">Streak</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">
-            {streakDays !== null ? `${streakDays} ${streakDays === 1 ? 'Day' : 'Days'}` : '—'}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Active Study Streak</p>
+          <div>
+            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">
+              {streakDays !== null ? `${streakDays} ${streakDays === 1 ? 'Day' : 'Days'}` : '—'}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Active Study Streak</p>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-xl space-y-2">
-          <div className="flex items-center justify-between text-rose-500">
-            <Activity className="w-5 h-5" />
-            <span className="text-xs font-semibold px-2 py-0.5 bg-rose-500/10 rounded-full">Retention</span>
+        {/* Card 4: Estimated Mastery */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-xl flex flex-col justify-between group">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-[#071d49] shadow-[0_0_14px_rgba(244,63,94,0.4)] dark:shadow-[0_0_14px_rgba(255,255,255,0.25)] transition-all group-hover:scale-105">
+              <img src={retentionIcon} alt="Retention" className="w-full h-full object-cover scale-[1.25]" />
+            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-full">Retention</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-slate-100">
-            {masteryPercent !== null ? `${masteryPercent}%` : '—'}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Estimated Mastery</p>
+          <div>
+            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">
+              {masteryPercent !== null ? `${masteryPercent}%` : '—'}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Estimated Mastery</p>
+          </div>
         </div>
       </div>
 

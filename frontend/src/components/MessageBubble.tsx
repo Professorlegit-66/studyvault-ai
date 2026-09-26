@@ -1,162 +1,139 @@
 import React, { useState } from 'react';
+import { Bot, User, Pencil, Check, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
-import { Copy, Check, Edit2, X, Send, Bot, User, BookOpen } from 'lucide-react';
-
-interface Message {
-  id?: number | string;
-  sender: 'user' | 'ai';
-  text?: string;
-  content?: string;
-  sources?: string[];
-}
 
 interface MessageBubbleProps {
-  message: Message;
+  message: {
+    id?: string | number;
+    sender: 'user' | 'ai';
+    text?: string;
+    content?: string;
+    sources?: string[];
+  };
   onResubmit?: (newText: string) => void;
   markdownComponents?: any;
+  avatar?: React.ReactNode;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onResubmit, markdownComponents }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onResubmit, markdownComponents, avatar }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(message.text || message.content || '');
   const [copied, setCopied] = useState(false);
-  
-  const rawText = message.text || message.content || "";
-  const [editValue, setEditValue] = useState(rawText);
 
-  const isUser = message.sender === 'user';
+  const content = message.text || message.content || '';
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(rawText);
+    navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSaveAndSubmit = () => {
+  const handleSaveEdit = () => {
+    if (!editText.trim() || !onResubmit) return;
     setIsEditing(false);
-    if (onResubmit && editValue.trim() !== rawText) {
-      onResubmit(editValue);
-    }
-  };
-
-  // Intercept and merge custom table styling. Previously forced a fixed
-  // min-width on the table (800px) AND on every th/td (150px each) - that
-  // combination guaranteed overflow for any table with more than ~2
-  // columns, regardless of the chat bubble's actual width, which is what
-  // caused tables to get cropped and require horizontal scrolling even
-  // for normal-sized content. table-fixed + no forced min-widths lets
-  // columns share the available width and wrap text instead.
-  const mergedComponents = {
-    ...markdownComponents,
-    table: ({ node, ...props }: any) => (
-      <div className="not-prose w-full overflow-x-auto my-4 rounded-xl border border-slate-200 dark:border-slate-700 custom-scrollbar shadow-sm">
-        <table className="w-full text-left border-collapse text-sm table-auto" {...props} />
-      </div>
-    ),
-    th: ({ node, ...props }: any) => (
-      <th className="bg-slate-100 dark:bg-slate-800/80 p-4 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-slate-100 whitespace-normal break-words" {...props} />
-    ),
-    td: ({ node, ...props }: any) => (
-      <td className="p-4 border-b border-slate-200 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 align-top leading-relaxed whitespace-normal break-words" {...props} />
-    ),
+    onResubmit(editText.trim());
   };
 
   return (
-    <div className={`flex w-full gap-3 group ${isUser ? 'justify-end' : 'justify-start'}`}>
-      
-      {/* AI Avatar */}
-      {!isUser && (
-        <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit shrink-0 mt-1">
-          <Bot className="w-4 h-4" />
+    <div className={`flex gap-3 w-full ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+      {message.sender === 'ai' && (
+        <div className="shrink-0 mt-1">
+          {avatar ? avatar : (
+            <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
+              <Bot className="w-4 h-4" />
+            </div>
+          )}
         </div>
       )}
 
-      {/* Message Container: Groups the Bubble and the Action Buttons underneath */}
-      <div className={`flex flex-col max-w-[80%] md:max-w-[75%] min-w-0 ${isUser ? 'items-end' : 'items-start'}`}>
-        
-        {/* The Colored Speech Bubble */}
-        <div className={`w-full rounded-2xl p-3.5 text-sm shadow-sm ${
-          isUser 
-            ? 'bg-indigo-600 text-white rounded-br-none' 
-            : 'bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 rounded-bl-none'
+      <div className={`flex flex-col group max-w-[85%] sm:max-w-[75%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
+        <div className={`rounded-2xl px-4 py-3 text-sm shadow-xs transition-colors w-full ${
+          message.sender === 'user'
+            ? 'bg-indigo-600 text-white rounded-tr-xs'
+            : 'bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-tl-xs'
         }`}>
-          
           {isEditing ? (
-            <div className="flex flex-col gap-2 min-w-[250px] sm:min-w-[300px]">
+            <div className="space-y-2 w-full">
               <textarea
-                className="w-full bg-slate-800 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-sm"
-                rows={4}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                autoFocus
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-2.5 rounded-xl border border-indigo-500 focus:outline-none text-sm resize-none"
+                rows={3}
               />
-              <div className="flex justify-end gap-2 mt-2">
-                <button 
-                  onClick={() => { setIsEditing(false); setEditValue(rawText); }}
-                  className="flex items-center gap-1 text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-md transition-colors text-white"
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-3 py-1 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
                 >
-                  <X size={14} /> Cancel
+                  Cancel
                 </button>
-                <button 
-                  onClick={handleSaveAndSubmit}
-                  className="flex items-center gap-1 text-xs bg-indigo-500 hover:bg-indigo-400 px-3 py-1.5 rounded-md transition-colors text-white"
+                <button
+                  onClick={handleSaveEdit}
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold cursor-pointer"
                 >
-                  <Send size={14} /> Send
+                  Save & Resubmit
                 </button>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col min-w-0">
-              {isUser ? (
-                 <span className="whitespace-pre-wrap break-words">{rawText}</span>
+            <div className="space-y-2">
+              {message.sender === 'user' ? (
+                <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
               ) : (
-                 <div className="prose prose-invert max-w-none prose-sm overflow-hidden">
-                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={mergedComponents}>
-                     {rawText}
-                   </ReactMarkdown>
-                 </div>
+                <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {content}
+                  </ReactMarkdown>
+                </div>
               )}
-              
-              {/* Sources Block (Tutor Only) */}
+
               {message.sources && message.sources.length > 0 && (
-                <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                  <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span>Sources: {message.sources.join(', ')}</span>
+                <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1.5">
+                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">Sources:</span>
+                  {message.sources.map((src, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-slate-200/60 dark:bg-slate-900 rounded-md text-[11px]">
+                      {src}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* The Action Buttons (Outside the bubble, underneath) */}
+        {/* Action buttons underneath */}
         {!isEditing && (
-          <div className="flex gap-1 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-1">
-            {isUser && onResubmit && (
-              <button 
-                onClick={() => setIsEditing(true)}
-                className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded transition-colors"
-                title="Edit message"
+          <div className={`flex items-center gap-1 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-slate-700 dark:text-slate-300 ${
+            message.sender === 'user' ? 'justify-end' : 'justify-start'
+          }`}>
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm px-1.5 py-0.5">
+              <button
+                onClick={handleCopy}
+                className="p-1 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
+                title="Copy text"
               >
-                <Edit2 size={13} />
+                {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
               </button>
-            )}
-            <button 
-              onClick={handleCopy}
-              className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded transition-colors"
-              title="Copy to clipboard"
-            >
-              {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
-            </button>
+              {message.sender === 'user' && onResubmit && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="p-1 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
+                  title="Edit message"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
         )}
-
       </div>
 
-      {/* User Avatar */}
-      {isUser && (
-        <div className="p-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg h-fit shrink-0 mt-1">
-          <User className="w-4 h-4" />
+      {message.sender === 'user' && (
+        <div className="shrink-0 mt-1">
+          <div className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg">
+            <User className="w-4 h-4" />
+          </div>
         </div>
       )}
     </div>

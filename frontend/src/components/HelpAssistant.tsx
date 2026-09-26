@@ -1,8 +1,9 @@
 // File: frontend/src/components/HelpAssistant.tsx
 
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Trash2, Copy, Check, Edit2, Send, Bot, User, Loader2 } from 'lucide-react';
+import { X, Trash2, Copy, Check, Edit2, Send, User, Loader2 } from 'lucide-react';
 import { apiClient } from '../api/client';
+import helpIcon from '../assets/studyvault-help-assistant-icon.png';
 
 interface HelpMessage {
   id: string;
@@ -146,15 +147,30 @@ export default function HelpAssistant() {
   };
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative cursor-default select-none">
       <button
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={isOpen ? 'Close help assistant' : 'Open help assistant'}
         aria-expanded={isOpen}
-        className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-colors cursor-pointer"
-        title="Help"
+        className={`rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+          isOpen
+            ? 'p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            : 'shadow-[0_0_15px_rgba(255,255,255,0.7)] dark:shadow-[0_0_12px_rgba(255,255,255,0.15)] hover:scale-105'
+        }`}
+        title="Help Assistant"
       >
-        {isOpen ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+        {isOpen ? (
+          <X className="w-6 h-6 pointer-events-none" />
+        ) : (
+          <div className="w-9 h-9 rounded-xl overflow-hidden bg-[#071d49] pointer-events-none">
+            <img 
+              src={helpIcon} 
+              alt="Help Assistant" 
+              className="w-full h-full object-cover scale-[1.25] pointer-events-none select-none" 
+              draggable={false} 
+            />
+          </div>
+        )}
       </button>
 
       {isOpen && (
@@ -164,11 +180,21 @@ export default function HelpAssistant() {
             w-96 max-w-[calc(100vw-2rem)]
             h-[30rem] max-h-[75vh]
             flex flex-col rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700
-            bg-white dark:bg-slate-900 overflow-hidden z-50 animate-fadeIn
+            bg-white dark:bg-slate-900 overflow-hidden z-50 animate-fadeIn cursor-default
           "
         >
           <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-indigo-600 text-white shrink-0">
-            <span className="font-bold text-sm">Help Assistant</span>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg overflow-hidden shrink-0 shadow-[0_0_8px_rgba(255,255,255,0.6)] pointer-events-none">
+                <img 
+                  src={helpIcon} 
+                  alt="Help Assistant" 
+                  className="w-full h-full object-cover scale-[1.25] pointer-events-none select-none" 
+                  draggable={false} 
+                />
+              </div>
+              <span className="font-bold text-sm pointer-events-none">Help Assistant</span>
+            </div>
             
             <div className="flex items-center gap-2">
               {messages.length > 1 && (
@@ -177,7 +203,7 @@ export default function HelpAssistant() {
                   className="p-1 hover:bg-indigo-500 rounded-lg text-white/90 hover:text-white transition-colors cursor-pointer"
                   title="Clear chat history"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-4 h-4 pointer-events-none" />
                 </button>
               )}
               <button
@@ -185,7 +211,7 @@ export default function HelpAssistant() {
                 className="p-1 hover:bg-indigo-500 rounded-lg text-white/90 hover:text-white transition-colors cursor-pointer"
                 aria-label="Close help assistant"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 pointer-events-none" />
               </button>
             </div>
           </div>
@@ -198,12 +224,17 @@ export default function HelpAssistant() {
                   
                   {/* Assistant Avatar */}
                   {!isUser && (
-                    <div className="p-1.5 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit shrink-0 mt-1">
-                      <Bot className="w-3.5 h-3.5" />
+                    <div className="w-7 h-7 rounded-xl overflow-hidden shrink-0 mt-1 shadow-[0_0_10px_rgba(255,255,255,0.6)] dark:shadow-[0_0_8px_rgba(255,255,255,0.15)] bg-[#071d49] pointer-events-none">
+                      <img 
+                        src={helpIcon} 
+                        alt="Help Assistant" 
+                        className="w-full h-full object-cover scale-[1.25] pointer-events-none select-none" 
+                        draggable={false} 
+                      />
                     </div>
                   )}
 
-                  {/* Message Container: Groups the Bubble and Action Buttons */}
+                  {/* Message Container */}
                   <div className={`flex flex-col max-w-[80%] min-w-0 ${isUser ? 'items-end' : 'items-start'}`}>
                     
                     <div className={`w-full rounded-2xl p-3 text-xs leading-relaxed shadow-sm ${
@@ -216,22 +247,22 @@ export default function HelpAssistant() {
                           <textarea
                             value={editText}
                             onChange={(e) => setEditText(e.target.value)}
-                            className="w-full bg-slate-900 text-white p-2 rounded-lg text-xs outline-none resize-none border border-slate-700 focus:border-indigo-500"
+                            className="w-full bg-slate-900 text-white p-2 rounded-lg text-xs outline-none resize-none border border-slate-700 focus:border-indigo-500 cursor-text"
                             rows={3}
                             autoFocus
                           />
                           <div className="flex justify-end gap-1.5">
                             <button
                               onClick={() => setEditingMessageId(null)}
-                              className="flex items-center gap-1 text-[11px] bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded text-white"
+                              className="flex items-center gap-1 text-[11px] bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded text-white cursor-pointer"
                             >
-                              <X size={12} /> Cancel
+                              <X size={12} className="pointer-events-none" /> Cancel
                             </button>
                             <button
                               onClick={() => handleSaveEdit(msg.id, editText)}
-                              className="flex items-center gap-1 text-[11px] bg-indigo-500 hover:bg-indigo-400 px-2.5 py-1 rounded text-white"
+                              className="flex items-center gap-1 text-[11px] bg-indigo-500 hover:bg-indigo-400 px-2.5 py-1 rounded text-white cursor-pointer"
                             >
-                              <Send size={12} /> Send
+                              <Send size={12} className="pointer-events-none" /> Send
                             </button>
                           </div>
                         </div>
@@ -240,7 +271,7 @@ export default function HelpAssistant() {
                       )}
                     </div>
 
-                    {/* Action Buttons (Underneath bubble, revealed on group hover) */}
+                    {/* Action Buttons */}
                     {!editingMessageId && (
                       <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-1">
                         {isUser && (
@@ -249,18 +280,18 @@ export default function HelpAssistant() {
                               setEditingMessageId(msg.id);
                               setEditText(msg.text);
                             }}
-                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded transition-colors"
+                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded transition-colors cursor-pointer"
                             title="Edit message"
                           >
-                            <Edit2 size={12} />
+                            <Edit2 size={12} className="pointer-events-none" />
                           </button>
                         )}
                         <button
                           onClick={() => handleCopy(msg.text, msg.id)}
-                          className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded transition-colors"
+                          className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded transition-colors cursor-pointer"
                           title="Copy to clipboard"
                         >
-                          {copiedId === msg.id ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                          {copiedId === msg.id ? <Check size={12} className="text-green-500 pointer-events-none" /> : <Copy size={12} className="pointer-events-none" />}
                         </button>
                       </div>
                     )}
@@ -268,7 +299,7 @@ export default function HelpAssistant() {
 
                   {/* User Avatar */}
                   {isUser && (
-                    <div className="p-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg h-fit shrink-0 mt-1">
+                    <div className="p-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg h-fit shrink-0 mt-1 pointer-events-none">
                       <User className="w-3.5 h-3.5" />
                     </div>
                   )}
@@ -277,9 +308,14 @@ export default function HelpAssistant() {
             })}
 
             {isLoading && (
-              <div className="flex gap-2 justify-start items-center text-slate-500 dark:text-slate-400 text-xs">
-                <div className="p-1.5 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg h-fit shrink-0 mt-1">
-                  <Bot className="w-3.5 h-3.5" />
+              <div className="flex gap-2 justify-start items-center text-slate-500 dark:text-slate-400 text-xs pointer-events-none">
+                <div className="w-7 h-7 rounded-xl overflow-hidden shrink-0 mt-1 shadow-[0_0_10px_rgba(255,255,255,0.6)] dark:shadow-[0_0_8px_rgba(255,255,255,0.15)] bg-[#071d49]">
+                  <img 
+                    src={helpIcon} 
+                    alt="Help Assistant" 
+                    className="w-full h-full object-cover scale-[1.25] pointer-events-none select-none" 
+                    draggable={false} 
+                  />
                 </div>
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-slate-100">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
@@ -297,7 +333,7 @@ export default function HelpAssistant() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask how to use any feature..."
-              className="flex-1 min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-text"
             />
             <button
               onClick={() => handleSend()}

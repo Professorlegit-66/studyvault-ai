@@ -1,3 +1,6 @@
+// File: frontend/src/components/DocumentManager.tsx
+
+import documentsVaultIcon from '../assets/documents-vault-tab-icon.png';
 import React, { useState } from 'react';
 import { apiClient } from '../api/client';
 import { FileText, Upload, Sparkles, Trash2, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, Eye, X, Search, ArrowUpDown } from 'lucide-react';
@@ -29,10 +32,7 @@ interface DocumentManagerProps {
   onDocumentsChange: () => void;
 }
 
-export const DocumentManager: React.FC<DocumentManagerProps> = ({ 
-  documents, 
-  onDocumentsChange 
-}) => {
+export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, onDocumentsChange }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generatingId, setGeneratingId] = useState<number | null>(null);
@@ -49,15 +49,11 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
-
     e.target.value = '';
-
     setUploadError(null);
     setSuccessMsg(null);
 
-    const isDuplicate = documents.some(
-      (doc) => doc.title.toLowerCase() === file.name.toLowerCase()
-    );
+    const isDuplicate = documents.some((doc) => doc.title.toLowerCase() === file.name.toLowerCase());
     if (isDuplicate) {
       setUploadError(`A document named "${file.name}" already exists. Rename the file, or delete the existing one first.`);
       return;
@@ -76,11 +72,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
     } catch (err: any) {
       console.error('Failed to upload document', err);
       const detail = err.response?.data?.detail;
-      setUploadError(
-        typeof detail === 'string'
-          ? detail
-          : 'Failed to upload document. Please try again.'
-      );
+      setUploadError(typeof detail === 'string' ? detail : 'Failed to upload document. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -95,8 +87,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
       setTimeout(() => setSuccessMsg(null), 5000);
     } catch (err: any) {
       console.error('Failed to generate flashcards', err);
-      const errorMsg = err.response?.data?.detail || 'Failed to generate flashcards.';
-      alert(errorMsg);
+      alert(err.response?.data?.detail || 'Failed to generate flashcards.');
     } finally {
       setGeneratingId(null);
     }
@@ -136,7 +127,6 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
 
   const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
-
     setDeleting(true);
     try {
       for (const id of selectedIds) {
@@ -159,30 +149,33 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
     .slice()
     .sort((a, b) => {
       switch (sortOption) {
-        case 'name-asc':
-          return a.title.localeCompare(b.title);
-        case 'name-desc':
-          return b.title.localeCompare(a.title);
-        case 'size-asc':
-          return (a.file_size ?? 0) - (b.file_size ?? 0);
-        case 'size-desc':
-          return (b.file_size ?? 0) - (a.file_size ?? 0);
-        case 'date-asc':
-          return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime();
-        case 'date-desc':
-        default:
-          return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+        case 'name-asc': return a.title.localeCompare(b.title);
+        case 'name-desc': return b.title.localeCompare(a.title);
+        case 'size-asc': return (a.file_size ?? 0) - (b.file_size ?? 0);
+        case 'size-desc': return (b.file_size ?? 0) - (a.file_size ?? 0);
+        case 'date-asc': return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime();
+        case 'date-desc': default: return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
       }
     });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Documents Vault</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Upload study notes, view documents, highlight snippets, and generate AI-powered flashcards.</p>
+      <div className="flex flex-wrap items-center justify-between gap-4 shrink-0 w-full select-none pointer-events-none">
+        <div className="flex flex-col gap-1 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg overflow-hidden bg-[#071d49] shadow-[0_0_10px_rgba(99,102,241,0.4)] dark:shadow-[0_0_10px_rgba(255,255,255,0.25)] flex items-center justify-center">
+              <img src={documentsVaultIcon} alt="Documents Vault" className="w-full h-full object-cover scale-[1.25]" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
+              Documents Vault
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            Upload study notes, view documents, highlight snippets, and generate AI-powered flashcards.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 ml-auto pointer-events-auto">
           {documents.length > 0 && (
             <button
               onClick={() => {
@@ -190,10 +183,10 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
                 setSelectedIds([]);
                 setShowConfirm(false);
               }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer border ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer border shrink-0 whitespace-nowrap ${
                 isSelectMode
                   ? 'bg-rose-500/10 border-rose-500/30 text-rose-500'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               <Trash2 className="w-4 h-4" />
@@ -201,7 +194,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
             </button>
           )}
 
-          <label className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer shadow-lg shadow-indigo-600/30">
+          <label className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer shadow-lg shadow-indigo-600/30 shrink-0 whitespace-nowrap">
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             <span>{uploading ? 'Uploading...' : 'Upload Document'}</span>
             <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
@@ -224,7 +217,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
       )}
 
       {isSelectMode && documents.length > 0 && (
-        <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-900 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800">
           <button
             onClick={toggleSelectAll}
             className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
@@ -254,7 +247,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
       />
 
       {documents.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center space-y-4 shadow-xl">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center space-y-4 shadow-xl">
           <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 rounded-full flex items-center justify-center mx-auto">
             <FileText className="w-6 h-6" />
           </div>
@@ -265,15 +258,15 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
         </div>
       ) : (
         <>
-          <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md">
+          <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md cursor-default select-none">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search documents by name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors cursor-text"
               />
             </div>
 
@@ -294,80 +287,80 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
           </div>
 
           {displayedDocuments.length === 0 ? (
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center space-y-4 shadow-xl">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center space-y-4 shadow-xl">
               <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">No matching documents</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
                 Try a different search term.
               </p>
             </div>
           ) : (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-200 dark:divide-slate-700">
-          {displayedDocuments.map((doc) => {
-            const isSelected = selectedIds.includes(doc.id);
-            const isViewable = doc.title.toLowerCase().endsWith('.pdf') ||
-                   doc.title.toLowerCase().endsWith('.txt') ||
-                   doc.title.toLowerCase().endsWith('.md') ||
-                   doc.title.toLowerCase().endsWith('.docx');
-            return (
-              <div
-                key={doc.id}
-                onClick={() => isSelectMode && toggleSelectDoc(doc.id)}
-                className={`p-4 flex items-center justify-between transition-colors ${
-                  isSelectMode ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50' : ''
-                } ${isSelected ? 'bg-indigo-500/5 dark:bg-indigo-500/10' : ''}`}
-              >
-                <div className="flex items-center gap-3">
-                  {isSelectMode && (
-                    <div className="text-indigo-600 dark:text-indigo-400">
-                      {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-slate-400" />}
-                    </div>
-                  )}
-                  <div className="p-2.5 bg-indigo-500/10 text-indigo-500 rounded-xl">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Added {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Recently'}
-                      {doc.file_size !== undefined && ` • ${formatFileSize(doc.file_size)}`}
-                    </p>
-                  </div>
-                </div>
-
-                {!isSelectMode && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        if (isViewable) {
-                          setSelectedDoc(doc);
-                        } else {
-                          alert('Interactive viewing is currently supported for PDF, TXT, MD, and DOCX files. You can generate flashcards directly using the Generate Flashcards button.');
-                        }
-                      }}
-                      className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-medium transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
-                      title="View Document"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>View</span>
-                    </button>
-
-                    <button
-                      onClick={() => generateFlashcards(doc.id)}
-                      disabled={generatingId === doc.id}
-                      className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 border border-slate-200 dark:border-slate-700"
-                    >
-                      {generatingId === doc.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
-                      ) : (
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-200 dark:divide-slate-800">
+              {displayedDocuments.map((doc) => {
+                const isSelected = selectedIds.includes(doc.id);
+                const isViewable = doc.title.toLowerCase().endsWith('.pdf') ||
+                       doc.title.toLowerCase().endsWith('.txt') ||
+                       doc.title.toLowerCase().endsWith('.md') ||
+                       doc.title.toLowerCase().endsWith('.docx');
+                return (
+                  <div
+                    key={doc.id}
+                    onClick={() => isSelectMode && toggleSelectDoc(doc.id)}
+                    className={`p-4 flex items-center justify-between transition-colors ${
+                      isSelectMode ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''
+                    } ${isSelected ? 'bg-indigo-500/5 dark:bg-indigo-500/10' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {isSelectMode && (
+                        <div className="text-indigo-600 dark:text-indigo-400">
+                          {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-slate-400" />}
+                        </div>
                       )}
-                      <span>Generate Flashcards</span>
-                    </button>
+                      <div className="p-2.5 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doc.title}</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Added {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Recently'}
+                          {doc.file_size !== undefined && ` • ${formatFileSize(doc.file_size)}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {!isSelectMode && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (isViewable) {
+                              setSelectedDoc(doc);
+                            } else {
+                              alert('Interactive viewing is currently supported for PDF, TXT, MD, and DOCX files. You can generate flashcards directly using the Generate Flashcards button.');
+                            }
+                          }}
+                          className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 dark:bg-slate-950 hover:bg-slate-200 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-medium transition-colors cursor-pointer border border-slate-200 dark:border-slate-800"
+                          title="View Document"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
+                        </button>
+
+                        <button
+                          onClick={() => generateFlashcards(doc.id)}
+                          disabled={generatingId === doc.id}
+                          className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-950 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 border border-slate-200 dark:border-slate-800"
+                        >
+                          {generatingId === doc.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                          )}
+                          <span>Generate Flashcards</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
             </div>
           )}
         </>
@@ -376,8 +369,6 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
       {selectedDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-md p-4 sm:p-6 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl relative max-h-[90vh] overflow-hidden">
-
-            {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
               <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 truncate max-w-xl">
                 <FileText className="w-5 h-5 text-indigo-500 shrink-0" /> {selectedDoc.title}
@@ -389,22 +380,13 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-
-            {/* Modal Body without nested wrapper card */}
             <div className="p-6 overflow-y-auto flex-1 bg-slate-50 dark:bg-slate-950/50">
               {selectedDoc.title.toLowerCase().endsWith('.pdf') ? (
-                <PdfViewer
-                  documentId={selectedDoc.id}
-                  onSnippetSelect={handleSnippetSelect}
-                />
+                <PdfViewer documentId={selectedDoc.id} onSnippetSelect={handleSnippetSelect} />
               ) : (
-                <TextViewer
-                  documentId={selectedDoc.id}
-                  onSnippetSelect={handleSnippetSelect}
-                />
+                <TextViewer documentId={selectedDoc.id} onSnippetSelect={handleSnippetSelect} />
               )}
             </div>
-
           </div>
         </div>
       )}

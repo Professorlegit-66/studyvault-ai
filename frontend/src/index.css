@@ -4,36 +4,24 @@
 @layer base {
   html, body {
     @apply bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
-    /* Deliberately NOT using the transition-colors utility here (via
-       @apply) - it would crossfade text color at the same time as
-       background color. Tailwind's dark: classes flip text from
-       near-black to near-white and backgrounds from near-white to
-       near-black simultaneously; animating both linearly means at the
-       transition's midpoint they both land on roughly the same mid-gray
-       value, making text briefly vanish against its own background (the
-       theme-toggle "flicker"). Transitioning only background-color keeps
-       the smooth fade while text switches instantly, avoiding the dip. */
     transition-property: background-color;
     transition-duration: 300ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    
-    /* Force the standard arrow cursor instead of the text I-beam in empty spaces */
     cursor: default;
   }
 
   html {
     color-scheme: light;
+    /* Dynamically controlled by App.tsx scale listener */
   }
   html.dark {
     color-scheme: dark;
   }
 
-  /* Hide the blinking text caret on general UI text while keeping text copyable */
   p, span, h1, h2, h3, h4, h5, h6, label {
     caret-color: transparent;
   }
 
-  /* Prevent text I-beam cursor and highlighting on structural UI elements (logos, headings, icons) */
   img, h1, h2, h3, h4, h5, h6, button, svg {
     user-select: none;
     -webkit-user-select: none;
@@ -44,13 +32,6 @@
   }
 }
 
-/* Same fix, app-wide: anywhere else in the codebase that uses Tailwind's
-   transition-colors / transition-all utility classes directly (e.g.
-   Dashboard.tsx's wrapper divs) gets color excluded from the animated
-   properties too, for the same reason as above. This is deliberately
-   NOT inside an @layer block - unlayered CSS always wins over @layer
-   content regardless of source order, so this reliably overrides
-   Tailwind's own utility-layer definitions of these two classes. */
 .transition-colors,
 .transition-all {
   transition-property: background-color, border-color, box-shadow, transform, opacity, width, height;
