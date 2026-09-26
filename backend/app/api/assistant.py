@@ -1,6 +1,10 @@
+# File: backend/routers/assistant.py
+
+import asyncio
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from google import genai
+from google.genai import types
 
 from app.config import settings
 from app.api.deps import get_current_user
@@ -46,20 +50,38 @@ async def query_assistant(
     payload: AssistantQueryRequest,
     current_user=Depends(get_current_user),
 ):
-    try:
-        response = client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=f"{APP_KNOWLEDGE}\n\nUser question: {payload.message}",
-        )
-        reply_text = response.text or "Sorry, I couldn't come up with an answer just now."
+    max_retries = 3
+    base_delay = 2.0
 
-    except Exception as e:
-        error_str = str(e)
-        if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
-            print(f"[Help Assistant] Gemini rate limit hit: {error_str}")
-            reply_text = "I've hit my usage limit for now — please try again in a little while."
-        else:
-            print(f"[Help Assistant] Unexpected error: {error_str}")
-            reply_text = "Sorry, something went wrong on my end. Please try again."
+    for attempt in range(max_retries):
+        try:
+            # Shifted to a chat-based implementation utilizing system_instruction
+            chat = client.chats.create(
+                model="gemini-3.5-flash",
+                config=types.GenerateContentConfig(
+                    system_instruction=APP_KNOWLEDGE,
+                )
+            )
+            
+            response = chat.send_message(payload.message)
+            reply_text = response.text or "Sorry, I couldn't come up with an answer just now."
+            
+            return AssistantQueryResponse(reply=reply_text)
 
-    return AssistantQueryResponse(reply=reply_text)
+        except Exception as e:
+            error_str = str(e)
+            
+            # Catch 503 UNAVAILABLE (demand spikes) and 429 RESOURCE_EXHAUSTED (rate limits)
+            if any(err in error_str for err in ["503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED"]):
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)  # Exponential backoff: 2s, 4s, etc.
+                    print(f"[Help Assistant] API busy (503/429). Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(delay)
+                else:
+                    print(f"[Help Assistant] Max retries reached: {error_str}")
+                    reply_text = "The Help Assistant is currently experiencing unusually high demand. Please try again in a minute."
+                    return AssistantQueryResponse(reply=reply_text)
+            else:
+                print(f"[Help Assistant] Unexpected error: {error_str}")
+                reply_text = "Sorry, something went wrong on my end. Please try again."
+                return AssistantQueryResponse(reply=reply_text)
