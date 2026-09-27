@@ -2,26 +2,30 @@
 
 An AI-powered study companion for students. Upload a document, get a grounded summary and Q&A, turn it into spaced-repetition flashcards, and keep a persistent-memory AI companion alongside it all.
 
-**Live app:** [studyvault-ai-gamma.vercel.app](https://studyvault-ai-gamma.vercel.app)
+**Live app:** [studyvault-ai-gamma.vercel.app](https://studyvault-ai-gamma.vercel.app?utm_source=gemini)
 
-> Built as a 48-hour hackathon MVP, then extended well beyond that scope. See [Project History](#project-history) below.
+> Built as a 48-hour hackathon MVP, then extended well beyond that scope. See [Project History](https://www.google.com/search?q=%23project-history&utm_source=gemini) below.
 
 ---
 
 ## Features:
 
-- **Document upload & processing** — PDF, DOCX, TXT, and Markdown. Text is extracted, chunked, and embedded for retrieval.
-- **AI summary & key points** — a grounded summary generated from the document itself, not a generic response.
-- **Document Q&A (RAG)** — ask questions about an uploaded document; answers are retrieved and grounded in the actual content, with an honest "not found" response when the material doesn't cover it.
-- **AI-generated flashcards** — from an entire document or a highlighted snippet, reviewed via the **SM-2 spaced-repetition algorithm**.
-- **AI Companion** — a general-purpose chat, separate from document Q&A, with **persistent cross-conversation memory**: tell it something once, and it's available in any future conversation.
-- **In-app Help Assistant** — a floating widget that answers "how do I use this app" questions.
-- **Email-verified accounts** — registration requires a 6-digit OTP confirmed by email before login is possible; changing your account email requires the same re-verification.
+* **Dashboard Analytics** — visualizes study progress with tracking for active study streaks, estimated mastery percentages, and a 52-week contribution heatmap for review history[cite: 7, 8].
+* **Document upload & processing** — PDF, DOCX, TXT, and Markdown[cite: 9]. Text is extracted, chunked, and embedded for retrieval. Users can sort files, view them interactively, or instantly generate flashcards directly from the vault list[cite: 9].
+* **AI summary & key points** — a grounded summary generated from the document itself, not a generic response.
+* **AI Tutor Chat (RAG)** — ask questions grounded strictly in your uploaded materials[cite: 10]. Features a **Single / Multi Document Context toggle** and a dropdown menu, allowing users to focus the AI's retrieval on one specific file or query across a custom selection of multiple documents simultaneously[cite: 10].
+* **AI-generated flashcards** — from an entire document or a highlighted snippet, reviewed via the **SM-2 spaced-repetition algorithm**.
+* **Interactive Review UI** — flashcards feature a seamless 3D flip animation, a dropdown to filter reviews by specific topics/documents, an export function, and keyboard shortcut support (`Space` to flip, `1-4` to rate recall)[cite: 12].
+* **AI Companion** — a general-purpose chat, separate from document Q&A, with **persistent cross-conversation memory**: tell it something once, and it's available in any future conversation[cite: 11].
+* **In-app Help Assistant** — a floating widget that answers "how do I use this app" questions[cite: 13], featuring an exponential backoff retry mechanism to gracefully handle Gemini API demand spikes (503/429 errors).
+* **UI/UX & Branding Polish** — responsive, collapsible dashboard sidebar, seamless logo integration using advanced CSS radial gradient masking, and globally synchronized 300ms light/dark theme transitions to eliminate component rendering lag.
+* **Clean Interaction Design** — optimized user interactions including drag-and-drop ghosting prevention on avatars and precise text-cursor containment within search bars and text inputs.
+* **Email-verified accounts** — registration requires a 6-digit OTP confirmed by email before login is possible; changing your account email requires the same re-verification.
 
 ## Tech Stack:
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | Frontend | React + TypeScript + Tailwind CSS, via Vite |
 | Backend | FastAPI (Python), served by Uvicorn |
 | Database | PostgreSQL, via SQLAlchemy's async ORM (`asyncpg`) |
@@ -35,20 +39,20 @@ An AI-powered study companion for students. Upload a document, get a grounded su
 ### Deployment:
 
 | Service | Platform |
-|---|---|
-| Frontend | [Vercel](https://vercel.com) |
-| Backend | [Render](https://render.com) (free tier — the API may take 30–60s to respond after a period of inactivity while the instance wakes up) |
+| --- | --- |
+| Frontend | [Vercel](https://vercel.com?utm_source=gemini) |
+| Backend | [Render](https://render.com?utm_source=gemini) (free tier — the API may take 30–60s to respond after a period of inactivity while the instance wakes up) |
 | Database | Hosted PostgreSQL |
 
 ## Getting Started (Local Development):
 
 ### Prerequisites:
 
-- Python 3.11+
-- Node.js 18+
-- A PostgreSQL instance
-- A Google Gemini API key
-- A Brevo account + API key (for sending OTP emails)
+* Python 3.11+
+* Node.js 18+
+* A PostgreSQL instance
+* A Google Gemini API key
+* A Brevo account + API key (for sending OTP emails)
 
 ### Backend setup:
 
@@ -57,13 +61,15 @@ cd backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1   # Windows PowerShell — use source venv/bin/activate on macOS/Linux
 pip install -r requirements.txt
+
 ```
 
-Create a `.env` file in `backend/` (see [Environment Variables](#environment-variables) below), then run migrations and start the server:
+Create a `.env` file in `backend/` (see [Environment Variables](https://www.google.com/search?q=%23environment-variables&utm_source=gemini) below), then run migrations and start the server:
 
 ```bash
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
+
 ```
 
 The API will be available at `http://localhost:8000`, with interactive docs at `http://localhost:8000/docs`.
@@ -74,6 +80,7 @@ The API will be available at `http://localhost:8000`, with interactive docs at `
 cd frontend
 npm install
 npm run dev
+
 ```
 
 The app will be available at `http://localhost:5173`, pointed at the local backend by default.
@@ -89,12 +96,14 @@ GEMINI_API_KEY=<your Gemini API key>
 BREVO_API_KEY=<your Brevo API key>
 BREVO_FROM_EMAIL=<the address OTP emails are sent from>
 CORS_ORIGINS=["http://localhost:5173", "http://127.0.0.1:5173"]
+
 ```
 
 **Frontend** (`frontend/.env`, optional):
 
 ```
 VITE_API_BASE_URL=http://localhost:8000/api
+
 ```
 
 Omit this to fall back to the local-dev default automatically.
@@ -124,22 +133,23 @@ studyvault-ai
     │   ├── context         # Auth & theme providers
     │   └── pages           # Top-level views
     └── package.json
+
 ```
 
 ## Security Notes:
 
-- Passwords are hashed with `bcrypt`; JWTs are used for session auth.
-- Every document, flashcard, conversation, and memory operation verifies ownership server-side — a user ID is never trusted from the frontend.
-- Uploaded files are stored under UUID-based names, never the original filename.
-- Account access requires a verified email address; changing the account email requires re-verifying the new address via a fresh OTP before it takes effect.
-- Unverified accounts older than 24 hours are automatically cleaned up by a background task.
+* Passwords are hashed with `bcrypt`; JWTs are used for session auth.
+* Every document, flashcard, conversation, and memory operation verifies ownership server-side — a user ID is never trusted from the frontend.
+* Uploaded files are stored under UUID-based names, never the original filename.
+* Account access requires a verified email address; changing the account email requires re-verifying the new address via a fresh OTP before it takes effect.
+* Unverified accounts older than 24 hours are automatically cleaned up by a background task.
 
 ## Known Limitations:
 
-- **Do not upload sensitive or confidential documents.** This is a student hackathon project, not a security-audited product. Uploaded content is processed by a third-party AI provider (Google Gemini) and stored in a shared-hosting database; it is not encrypted at rest, and (see below) the raw file itself isn't guaranteed to persist. Use sample notes, public course material, or other non-sensitive documents when testing or demoing.
-- **File storage is ephemeral in production.** The backend's free-tier hosting runs on an ephemeral filesystem, so uploaded files may not survive a redeploy or restart. Document content itself is safe (it's stored as extracted, embedded text in Postgres), but the original raw file — and the ability to re-download it — is not guaranteed to persist.
-- **Cold starts.** The free-tier backend sleeps after a period of inactivity; the first request afterward may take up to a minute.
-- **RAG uses in-process cosine similarity**, not a dedicated vector database — fine at this scale, but not built to scale to a large document corpus.
+* **Do not upload sensitive or confidential documents.** This is a student hackathon project, not a security-audited product. Uploaded content is processed by a third-party AI provider (Google Gemini) and stored in a shared-hosting database; it is not encrypted at rest, and (see below) the raw file itself isn't guaranteed to persist. Use sample notes, public course material, or other non-sensitive documents when testing or demoing.
+* **File storage is ephemeral in production.** The backend's free-tier hosting runs on an ephemeral filesystem, so uploaded files may not survive a redeploy or restart. Document content itself is safe (it's stored as extracted, embedded text in Postgres), but the original raw file — and the ability to re-download it — is not guaranteed to persist.
+* **Cold starts.** The free-tier backend sleeps after a period of inactivity; the first request afterward may take up to a minute.
+* **RAG uses in-process cosine similarity**, not a dedicated vector database — fine at this scale, but not built to scale to a large document corpus.
 
 ## Project History:
 
@@ -147,4 +157,4 @@ This project started as a 48-hour hackathon MVP scoped to document upload, summa
 
 ## License:
 
-Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md) — you're free to view, run, and modify this code for any noncommercial purpose (personal use, learning, research, coursework, etc.), but commercial use requires the copyright holder's permission. See [LICENSE.md](LICENSE.md) for the full terms.
+Licensed under the [PolyForm Noncommercial License 1.0.0](https://www.google.com/search?q=LICENSE.md&utm_source=gemini) — you're free to view, run, and modify this code for any noncommercial purpose (personal use, learning, research, coursework, etc.), but commercial use requires the copyright holder's permission. See [LICENSE.md](https://www.google.com/search?q=LICENSE.md&utm_source=gemini) for the full terms.
